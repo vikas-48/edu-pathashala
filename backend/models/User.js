@@ -15,6 +15,7 @@ const UserSchema = new mongoose.Schema({
   language: { type: String },
   timeSlot: { type: String },
   preferredStyle: { type: String },
+  completedTopics: [{ type: String }], // Added for topic completion
 
   // Mentor Specific
   studentsAssigned: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
@@ -25,7 +26,8 @@ const UserSchema = new mongoose.Schema({
   teachingStyle: { type: String },
   effectiveness: { type: Number, default: 0.7 },
   classRangeMin: { type: Number, min: 1, max: 12, default: 1 },
-  classRangeMax: { type: Number, min: 1, max: 12, default: 12 }
+  classRangeMax: { type: Number, min: 1, max: 12, default: 12 },
+  customCurriculum: { type: mongoose.Schema.Types.Mixed }, // Stores user-edited curriculum JSON
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

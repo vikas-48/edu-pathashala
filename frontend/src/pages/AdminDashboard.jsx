@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, BookOpen, TrendingUp, LogOut, AlertTriangle, UserPlus, Download, Check, X, Bell } from 'lucide-react';
+import { Users, BookOpen, TrendingUp, LogOut, AlertTriangle, UserPlus, Download, Check, X, Bell, Upload } from 'lucide-react';
+import Papa from 'papaparse';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -70,35 +71,90 @@ export default function AdminDashboard() {
     setLoadingReport(false);
   };
 
-  const [showOnboard, setShowOnboard] = useState(false);
-  const [onboardType, setOnboardType] = useState('Student');
-  const [formData, setFormData] = useState({
-    name: '', email: '', password: 'password123', age: '', learningLevel: 'Beginner',
-    subject: 'Math', language: 'Telugu', timeSlot: '5-6 PM', preferredStyle: 'Interactive',
-    subjects: ['Math'], languages: ['Telugu'], timeSlotMentor: '5-6 PM', teachingStyle: 'Interactive', effectiveness: 0.8
-  });
+   
 
-  const handleOnboard = async (e) => {
-    e.preventDefault();
-    const endpoint = onboardType === 'Student' ? '/api/students' : '/api/mentors';
-    try {
-      const res = await fetch(`http://127.0.0.1:5000${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (res.ok) {
-        alert(`${onboardType} onboarded successfully!`);
-        setShowOnboard(false);
-        fetchStats();
-        fetchPendingMatches();
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [uploadingCSV, setUploadingCSV] = useState(false);
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setUploadingCSV(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const res = await fetch('http://127.0.0.1:5000/api/admin/bulk-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ users: results.data })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            alert(`Success! Imported ${data.count} users and generated ${data.generatedMatches} new matches.`);
+            setShowBulkUpload(false);
+            fetchStats();
+            fetchPendingMatches();
+          } else {
+            alert(`Error processing file: ${data.error}`);
+          }
+        } catch (error) {
+          alert('Failed to connect to bulk upload API.');
+        }
+        setUploadingCSV(false);
+      },
+      error: (error) => {
+        alert('Error parsing CSV file');
+        setUploadingCSV(false);
       }
-    } catch (err) {
-      console.error(err);
-    }
+    });
   };
 
-  const updateForm = (key, value) => setFormData({ ...formData, [key]: value });
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [modalRole, setModalRole] = useState('Student');
+  const [modalUsers, setModalUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  const openUserModal = async (role) => {
+    setModalRole(role);
+    setShowUserModal(true);
+    setLoadingUsers(true);
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/api/admin/users?role=${role}`);
+      const data = await res.json();
+      setModalUsers(data);
+    } catch(e) { console.error(e) }
+    setLoadingUsers(false);
+  };
+
+  const exportModalUsers = () => {
+    if (!modalUsers || modalUsers.length === 0) return;
+    const rawHeaders = ['Name', 'Email', 'Role'];
+    if (modalRole === 'Student') rawHeaders.push('Level', 'Language', 'Subject');
+    else rawHeaders.push('Subjects', 'Teaching Style', 'Effectiveness');
+    
+    let csvContent = "data:text/csv;charset=utf-8," + rawHeaders.join(",") + "\n";
+    modalUsers.forEach(user => {
+        const base = `"${user.name || ''}","${user.email || ''}","${user.role || ''}"`;
+        let extra = '';
+        if (modalRole === 'Student') {
+            extra = `,"${user.learningLevel || 'N/A'}","${user.language || 'N/A'}","${user.subject || 'N/A'}"`;
+        } else {
+            extra = `,"${(user.subjects || []).join(';') || 'N/A'}","${user.teachingStyle || 'N/A'}","${user.effectiveness || ''}"`;
+        }
+        csvContent += base + extra + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${modalRole}s_Directory.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   return (
     <div className="container animate-fade-in">
@@ -108,8 +164,8 @@ export default function AdminDashboard() {
           <p>Platform overview and impact insights</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button onClick={() => setShowOnboard(!showOnboard)} className="btn btn-primary">
-            <UserPlus size={16} /> {showOnboard ? 'Close Form' : 'Onboard User'}
+          <button onClick={() => setShowBulkUpload(!showBulkUpload)} className="btn btn-primary">
+            <Upload size={16} /> Bulk Upload Users
           </button>
           <button onClick={downloadReport} className="btn btn-secondary" disabled={loadingReport}>
             <Download size={16} /> {loadingReport ? 'Exporting...' : 'Export'}
@@ -120,109 +176,36 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {showOnboard && (
+      {showBulkUpload && (
         <div className="glass-panel mb-4 animate-slide-up" style={{ border: '2px solid var(--primary-color)' }}>
-           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-              <button 
-                className={`btn ${onboardType === 'Student' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setOnboardType('Student')}
-              >Onboard Student</button>
-              <button 
-                className={`btn ${onboardType === 'Mentor' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setOnboardType('Mentor')}
-              >Onboard Mentor</button>
-           </div>
-
-           <form onSubmit={handleOnboard} className="grid-cols-2" style={{ gap: '1.5rem' }}>
-              <div>
-                <label className="form-label">Full Name</label>
-                <input className="form-control" type="text" required onChange={e => updateForm('name', e.target.value)} />
-              </div>
-              <div>
-                <label className="form-label">Email Address</label>
-                <input className="form-control" type="email" required onChange={e => updateForm('email', e.target.value)} />
-              </div>
-
-              {onboardType === 'Student' ? (
-                <>
-                  <div>
-                    <label className="form-label">Subject</label>
-                    <select className="form-control" onChange={e => updateForm('subject', e.target.value)}>
-                      <option>Math</option>
-                      <option>English</option>
-                      <option>Science</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Language</label>
-                    <select className="form-control" onChange={e => updateForm('language', e.target.value)}>
-                      <option>Telugu</option>
-                      <option>English</option>
-                      <option>Hindi</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Preferred Time</label>
-                    <select className="form-control" onChange={e => updateForm('timeSlot', e.target.value)}>
-                      <option>5-6 PM</option>
-                      <option>6-7 PM</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Learning Style</label>
-                    <select className="form-control" onChange={e => updateForm('preferredStyle', e.target.value)}>
-                      <option>Interactive</option>
-                      <option>Theory</option>
-                      <option>Visual</option>
-                    </select>
-                  </div>
-                </>
+           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Upload color="var(--primary-color)" /> Bulk Import Users</h3>
+           <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Upload an offline CSV file. The system will ingest users, auto-generate passwords if missing, and actively match unassigned students.</p>
+           
+           <div style={{ padding: '25px', border: `2px dashed ${uploadingCSV ? 'var(--primary-color)' : 'var(--border-color)'}`, borderRadius: '12px', textAlign: 'center', background: 'var(--bg-color)', transition: 'all 0.3s' }}>
+              <Upload size={36} color={uploadingCSV ? "var(--primary-color)" : "var(--text-muted)"} style={{ marginBottom: '10px' }} />
+              <div style={{ marginBottom: '15px', fontWeight: 'bold' }}>{uploadingCSV ? 'Processing rows and running matching engine...' : 'Select a .csv file to integrate'}</div>
+              {uploadingCSV ? (
+                 <p style={{ color: 'var(--primary-color)', fontStyle: 'italic' }}>Please wait, AI generation in progress...</p>
               ) : (
-                <>
-                  <div>
-                    <label className="form-label">Expertise (Subject)</label>
-                    <select className="form-control" onChange={e => updateForm('subjects', [e.target.value])}>
-                      <option>Math</option>
-                      <option>English</option>
-                      <option>Science</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Languages</label>
-                    <select className="form-control" onChange={e => updateForm('languages', [e.target.value])}>
-                      <option>Telugu</option>
-                      <option>English</option>
-                      <option>Hindi</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Teaching Style</label>
-                    <select className="form-control" onChange={e => updateForm('teachingStyle', e.target.value)}>
-                      <option>Interactive</option>
-                      <option>Theory</option>
-                      <option>Visual</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label">Effectiveness (0.1 - 1.0)</label>
-                    <input className="form-control" type="number" step="0.1" min="0.1" max="1" defaultValue="0.8" onChange={e => updateForm('effectiveness', parseFloat(e.target.value))} />
-                  </div>
-                </>
+                 <input type="file" accept=".csv" onChange={handleFileUpload} style={{ padding: '10px', background: 'white', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
               )}
-              
-              <div style={{ gridColumn: 'span 2' }}>
-                <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Complete Onboarding</button>
-              </div>
-           </form>
+           </div>
+           
+           <div style={{ marginTop: '1.5rem', background: 'var(--primary-light)', padding: '15px', borderRadius: '8px', fontSize: '0.85rem' }}>
+             <strong>Required Student Columns:</strong> name, email, role (Student), subject, language, timeSlot, learningLevel, preferredStyle<br/>
+             <strong style={{ marginTop: '5px', display: 'inline-block' }}>Required Mentor Columns:</strong> name, email, role (Mentor), subjects, languages, timeSlotMentor, teachingStyle, effectiveness
+           </div>
         </div>
       )}
+
+ 
 
       {!stats ? (
          <p>Loading analytics...</p>
       ) : (
         <>
           <div className="grid-cols-3 mb-4">
-            <div className="glass-panel">
+            <div className="glass-panel" onClick={() => openUserModal('Student')} style={{ cursor: 'pointer', border: '1px solid transparent' }} onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary-color)'} onMouseOut={(e) => e.currentTarget.style.borderColor = 'transparent'}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Users size={32} color="var(--primary-color)" />
                 <div>
@@ -232,7 +215,7 @@ export default function AdminDashboard() {
               </div>
             </div>
             
-            <div className="glass-panel">
+            <div className="glass-panel" onClick={() => openUserModal('Mentor')} style={{ cursor: 'pointer', border: '1px solid transparent' }} onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary-hover)'} onMouseOut={(e) => e.currentTarget.style.borderColor = 'transparent'}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <BookOpen size={32} color="var(--primary-hover)" />
                 <div>
@@ -317,6 +300,69 @@ export default function AdminDashboard() {
             </div>
           </div>
         </>
+      )}
+
+      {showUserModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-panel animate-slide-up" style={{ width: '90%', maxWidth: '800px', maxHeight: '80vh', overflow: 'auto', background: 'white', position: 'relative' }}>
+            <button onClick={() => setShowUserModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <X size={24} color="var(--text-muted)" />
+            </button>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+              {modalRole === 'Student' ? <Users color="var(--primary-color)" /> : <BookOpen color="var(--primary-hover)" />} 
+              {modalRole} Directory
+            </h2>
+            <button onClick={exportModalUsers} className="btn btn-primary" style={{ marginBottom: '1.5rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Download size={16} /> Export to CSV
+            </button>
+            
+            {loadingUsers ? <p>Loading user data...</p> : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-color)', textAlign: 'left', borderBottom: '2px solid var(--border-color)' }}>
+                      <th style={{ padding: '12px 15px', color: 'var(--secondary-color)' }}>Name</th>
+                      <th style={{ padding: '12px 15px', color: 'var(--secondary-color)' }}>Email</th>
+                      {modalRole === 'Student' ? (
+                        <>
+                          <th style={{ padding: '12px 15px', color: 'var(--secondary-color)' }}>Level</th>
+                          <th style={{ padding: '12px 15px', color: 'var(--secondary-color)' }}>Subject/Goal</th>
+                        </>
+                      ) : (
+                        <>
+                          <th style={{ padding: '12px 15px', color: 'var(--secondary-color)' }}>Expertise</th>
+                          <th style={{ padding: '12px 15px', color: 'var(--secondary-color)' }}>Style</th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalUsers.map(u => (
+                      <tr key={u._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '12px 15px' }}>{u.name}</td>
+                        <td style={{ padding: '12px 15px' }}>{u.email}</td>
+                        {modalRole === 'Student' ? (
+                          <>
+                            <td style={{ padding: '12px 15px' }}>{u.learningLevel || 'N/A'}</td>
+                            <td style={{ padding: '12px 15px' }}>{u.subject || 'N/A'}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td style={{ padding: '12px 15px' }}>{(u.subjects || []).join(', ')}</td>
+                            <td style={{ padding: '12px 15px' }}>{u.teachingStyle || 'N/A'}</td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                    {modalUsers.length === 0 && (
+                      <tr><td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

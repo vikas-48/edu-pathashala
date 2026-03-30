@@ -54,6 +54,19 @@ router.get('/admin/stats', async (req, res) => {
     }
 });
 
+// Admin Users List
+router.get('/admin/users', async (req, res) => {
+    try {
+        const { role } = req.query;
+        let query = {};
+        if (role) query.role = role;
+        const users = await User.find(query);
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Mentor Dashboard: Get assigned students and suggestions
 router.get('/mentor/students/:id', async (req, res) => {
     try {
@@ -120,9 +133,23 @@ router.post('/progress', async (req, res) => {
 // Student: Post a Doubt
 router.post('/doubts', async (req, res) => {
     try {
-        const doubt = await Doubt.create(req.body);
+        const { studentId, question, inputType } = req.body;
+        
+        // Safety: Always lookup mentorId from DB to handle stale frontend state
+        const student = await User.findById(studentId);
+        const mentorId = student?.mentorId || req.body.mentorId;
+
+        const doubt = await Doubt.create({
+          studentId,
+          mentorId,
+          question,
+          inputType: inputType || 'text',
+          status: 'Pending'
+        });
+        
         res.status(201).json(doubt);
     } catch (error) {
+        console.error('Post doubt error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -143,6 +170,57 @@ router.post('/doubts/answer', async (req, res) => {
         const { doubtId, answer } = req.body;
         const doubt = await Doubt.findByIdAndUpdate(doubtId, { answer, status: 'Answered' }, { new: true });
         res.json(doubt);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Bulk Upload Users
+router.post('/admin/bulk-upload', async (req, res) => {
+    try {
+        const { users } = req.body;
+        if (!users || !Array.isArray(users)) {
+            return res.status(400).json({ error: 'Invalid user data provided.' });
+        }
+
+        const addedUsers = [];
+        for (const userData of users) {
+             if (!userData.email || !userData.role) continue;
+             
+             if (!userData.password) userData.password = 'welcome123';
+             if (userData.subjects && typeof userData.subjects === 'string') {
+                 userData.subjects = userData.subjects.split(',').map(s => s.trim());
+             }
+             if (userData.languages && typeof userData.languages === 'string') {
+                 userData.languages = userData.languages.split(',').map(l => l.trim());
+             }
+
+             const user = await User.findOneAndUpdate(
+                 { email: userData.email },
+                 { $set: userData },
+                 { upsert: true, new: true }
+             );
+             addedUsers.push(user);
+        }
+
+        // Auto-run matching for all offline unassigned students
+        const allUnassignedStudents = await User.find({ role: 'Student', mentorId: null });
+        const allMentors = await User.find({ role: 'Mentor' });
+        
+        let matchCount = 0;
+        for (const student of allUnassignedStudents) {
+            const topMentors = getTopMatchesForStudent(student, allMentors);
+            for (const suggestion of topMentors) {
+                await Match.findOneAndUpdate(
+                    { studentId: student._id, mentorId: suggestion.mentorId },
+                    { score: suggestion.score / 100, status: 'pending' },
+                    { upsert: true, new: true }
+                );
+                matchCount++;
+            }
+        }
+
+        res.json({ message: 'Bulk imported successfully!', count: addedUsers.length, generatedMatches: matchCount });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -449,6 +527,16 @@ router.post('/ai/generate-content', async (req, res) => {
   }
 });
 
+// Student: Get lessons
+router.get('/ai/lessons/:studentId', async (req, res) => {
+  try {
+    const lessons = await AIContent.find({ studentId: req.params.studentId }).sort({ createdAt: -1 });
+    res.json(lessons);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/ai/student-content/:studentId
 // Student fetches their assigned AI lessons
 router.get('/ai/student-content/:studentId', async (req, res) => {
@@ -516,6 +604,73 @@ router.post('/ai/submit-quiz', async (req, res) => {
     res.json({ score, newLevel, levelChanged: newLevel !== currentLevel });
   } catch (error) {
     console.error('Quiz submit error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// User: Update Profile
+router.put('/user/profile/:id', async (req, res) => {
+  try {
+    const { name, classGrade, subject, subjects, teachingStyle } = req.body;
+    console.log('Profile update request for:', req.params.id, req.body);
+
+    // Validate class grade for students
+    if (classGrade && (classGrade < 1 || classGrade > 12)) {
+      return res.status(400).json({ error: 'Class Grade must be between 1 and 12' });
+    }
+
+    const updateData = { name };
+    if (classGrade) updateData.classGrade = Number(classGrade);
+    if (subject) updateData.subject = subject;
+    if (subjects) updateData.subjects = subjects;
+    if (teachingStyle) updateData.teachingStyle = teachingStyle;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    if (!updatedUser) return res.status(404).json({ error: 'User not found' });
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('Profile update error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to update profile' });
+  }
+});// Mentor Custom Curriculum update
+router.put('/mentor/:id/curriculum', async (req, res) => {
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { customCurriculum: req.body.curriculum },
+      { new: true }
+    );
+    res.json(updatedUser);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Toggle student topic completion
+router.put('/student/:id/topic-toggle', async (req, res) => {
+  try {
+    const { topic } = req.body;
+    const student = await User.findById(req.params.id);
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    
+    // Toggle logic
+    let completedTopics = student.completedTopics || [];
+    if (completedTopics.includes(topic)) {
+      completedTopics = completedTopics.filter(t => t !== topic);
+    } else {
+      completedTopics.push(topic);
+    }
+    
+    student.completedTopics = completedTopics;
+    await student.save();
+    
+    res.json(student);
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
