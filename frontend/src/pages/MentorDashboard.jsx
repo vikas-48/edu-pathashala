@@ -16,6 +16,7 @@ export default function MentorDashboard() {
   // AI Content State
   const [activeGenStudent, setActiveGenStudent] = useState(null); // student object
   const [genTopic, setGenTopic] = useState('');
+  const [genFile, setGenFile] = useState(null);
   const [genLoading, setGenLoading] = useState(false);
   const [genResult, setGenResult] = useState(null); // { lessonContent, quiz[], _id }
   const [genError, setGenError] = useState('');
@@ -267,25 +268,41 @@ export default function MentorDashboard() {
   const openGenPanel = (student) => {
     setActiveGenStudent(student);
     setGenTopic('');
+    setGenFile(null);
     setGenResult(null);
     setGenError('');
   };
 
   const generateContent = async () => {
-    if (!genTopic.trim()) return;
+    if (!genTopic.trim() && !genFile) return;
     setGenLoading(true);
     setGenError('');
     setGenResult(null);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/ai/generate-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: activeGenStudent._id,
-          mentorId: user._id,
-          topic: genTopic
-        })
-      });
+      let res;
+      if (genFile) {
+        const formData = new FormData();
+        formData.append('file', genFile);
+        formData.append('studentId', activeGenStudent._id);
+        formData.append('mentorId', user._id);
+        if (genTopic) formData.append('topic', genTopic);
+        
+        res = await fetch('http://127.0.0.1:5000/api/ai/generate-from-pdf', {
+          method: 'POST',
+          body: formData
+        });
+      } else {
+        res = await fetch('http://127.0.0.1:5000/api/ai/generate-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: activeGenStudent._id,
+            mentorId: user._id,
+            topic: genTopic
+          })
+        });
+      }
+      
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       setGenResult(json);
@@ -504,21 +521,32 @@ export default function MentorDashboard() {
               <button className="btn btn-secondary" onClick={() => setActiveGenStudent(null)}>✕ Close</button>
             </div>
 
-            {/* Topic Input */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
-              <input
-                className="form-control"
-                placeholder="Enter topic (e.g. Fractions, Photosynthesis, World War II)"
-                value={genTopic}
-                onChange={e => setGenTopic(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && generateContent()}
-                style={{ flex: 1 }}
-              />
+            {/* Topic & File Input */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  className="form-control"
+                  placeholder="Enter topic (e.g. Fractions, Photosynthesis)"
+                  value={genTopic}
+                  onChange={e => setGenTopic(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && generateContent()}
+                  style={{ flex: 1 }}
+                />
+                <label className="btn btn-secondary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <BookOpen size={16} /> {genFile ? 'Change PDF' : 'Upload PDF'}
+                  <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => setGenFile(e.target.files[0])} />
+                </label>
+              </div>
+              {genFile && (
+                <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  📄 <strong>{genFile.name}</strong> selected. AI will extract text from this PDF!
+                </div>
+              )}
               <button
                 className="btn btn-primary"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', minWidth: '160px' }}
+                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', width: '100%' }}
                 onClick={generateContent}
-                disabled={genLoading || !genTopic.trim()}
+                disabled={genLoading || (!genTopic.trim() && !genFile)}
               >
                 {genLoading ? <><Loader size={16} className="spin" /> Generating...</> : <><Sparkles size={16} /> Generate ✨</>}
               </button>
