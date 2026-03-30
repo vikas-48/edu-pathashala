@@ -89,19 +89,20 @@ function generateLearningPlan(topic, lastScore) {
 
 /**
  * Advanced Matching Engine based on the formula:
- * Score = (Subject * 30) + (Time * 20) + (Language * 15) + (Style * 15) + (Effectiveness * 20)
+ * Score = (Subject * 25) + (Time * 15) + (Language * 15) + (Style * 15) + (Effectiveness * 15) + (ClassRange * 15)
+ * Total max = 100
  */
 function calculateCompatibilityScore(student, mentor) {
   let score = 0;
 
-  // 1. Subject (30 points) - Mentor should have student's subject in their list
+  // 1. Subject (25 points) - Mentor should have student's subject in their list
   if (mentor.subjects && mentor.subjects.includes(student.subject)) {
-    score += 30;
+    score += 25;
   }
 
-  // 2. Time Slot (20 points) - Direct match
+  // 2. Time Slot (15 points) - Direct match
   if (mentor.timeSlotMentor === student.timeSlot) {
-    score += 20;
+    score += 15;
   }
 
   // 3. Language (15 points) - Mentor should speak student's primary language
@@ -114,9 +115,17 @@ function calculateCompatibilityScore(student, mentor) {
     score += 15;
   }
 
-  // 5. Effectiveness (20 points max) - Based on mentor.effectiveness (0.0 to 1.0)
-  const eff = mentor.effectiveness || 0.7; // Default if not set
-  score += (eff * 20);
+  // 5. Effectiveness (15 points max) - Based on mentor.effectiveness (0.0 to 1.0)
+  const eff = mentor.effectiveness || 0.7;
+  score += (eff * 15);
+
+  // 6. Class Range (15 points) - Mentor covers the student's class grade
+  const studentClass = student.classGrade || 1;
+  const minClass = mentor.classRangeMin || 1;
+  const maxClass = mentor.classRangeMax || 12;
+  if (studentClass >= minClass && studentClass <= maxClass) {
+    score += 15;
+  }
 
   return Math.round(score);
 }

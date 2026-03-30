@@ -8,9 +8,10 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    name: '', email: '', password: '', age: '', learningLevel: 'Beginner',
-    subject: 'Math', language: 'Telugu', timeSlot: '5-6 PM', preferredStyle: 'Interactive',
-    subjects: ['Math'], languages: ['Telugu'], timeSlotMentor: '5-6 PM', teachingStyle: 'Interactive', effectiveness: 0.8
+    name: '', email: '', password: '', age: '', classGrade: 1, learningLevel: 'Beginner',
+    subject: 'Math', language: 'Telugu', timeSlot: '4-5 PM', preferredStyle: 'Interactive',
+    subjects: ['Math'], languages: ['Telugu'], timeSlotMentor: '4-5 PM', teachingStyle: 'Interactive', effectiveness: 0.8,
+    classRangeMin: 1, classRangeMax: 12
   });
 
   const handleSignup = async (e) => {
@@ -86,6 +87,41 @@ export default function Signup() {
 
           {onboardType === 'Student' ? (
             <>
+              {/* Age */}
+              <div>
+                <label className="form-label">🎂 Age</label>
+                <input
+                  className="form-control"
+                  type="number"
+                  placeholder="e.g. 12"
+                  min="4"
+                  max="25"
+                  required
+                  onChange={e => updateForm('age', parseInt(e.target.value))}
+                />
+              </div>
+
+              {/* Class */}
+              <div>
+                <label className="form-label">🏫 Class</label>
+                <select className="form-control" defaultValue="1" onChange={e => updateForm('classGrade', parseInt(e.target.value))}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(cls => (
+                    <option key={cls} value={cls}>Class {cls}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Performance Level */}
+              <div>
+                <label className="form-label"><Award size={14} style={{ marginRight: '5px' }} /> Performance Level</label>
+                <select className="form-control" defaultValue="Beginner" onChange={e => updateForm('learningLevel', e.target.value)}>
+                  <option value="Beginner">🌱 Beginner</option>
+                  <option value="Intermediate">📈 Intermediate</option>
+                  <option value="Advanced">🚀 Advanced</option>
+                </select>
+              </div>
+
+              {/* Learning Subject */}
               <div>
                 <label className="form-label"><BookOpen size={14} style={{ marginRight: '5px' }} /> Learning Subject</label>
                 <select className="form-control" onChange={e => updateForm('subject', e.target.value)}>
@@ -105,8 +141,11 @@ export default function Signup() {
               <div>
                 <label className="form-label"><Clock size={14} style={{ marginRight: '5px' }} /> Time Slot</label>
                 <select className="form-control" onChange={e => updateForm('timeSlot', e.target.value)}>
+                  <option>4-5 PM</option>
                   <option>5-6 PM</option>
                   <option>6-7 PM</option>
+                  <option>7-8 PM</option>
+                  <option>8-9 PM</option>
                 </select>
               </div>
               <div>
@@ -139,8 +178,11 @@ export default function Signup() {
               <div>
                 <label className="form-label"><Clock size={14} style={{ marginRight: '5px' }} /> Teaching Time</label>
                 <select className="form-control" onChange={e => updateForm('timeSlotMentor', e.target.value)}>
+                  <option>4-5 PM</option>
                   <option>5-6 PM</option>
                   <option>6-7 PM</option>
+                  <option>7-8 PM</option>
+                  <option>8-9 PM</option>
                 </select>
               </div>
               <div>
@@ -150,6 +192,39 @@ export default function Signup() {
                   <option>Theory</option>
                   <option>Visual</option>
                 </select>
+              </div>
+
+              {/* Class Range — spans full width */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="form-label" style={{ display: 'block', marginBottom: '0.5rem' }}>🏫 Classes I Can Teach</label>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', opacity: 0.75 }}>From Class</label>
+                    <select
+                      className="form-control"
+                      defaultValue="1"
+                      onChange={e => updateForm('classRangeMin', parseInt(e.target.value))}
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(cls => (
+                        <option key={cls} value={cls}>Class {cls}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <span style={{ marginTop: '1.5rem', opacity: 0.6, fontWeight: 'bold' }}>→</span>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', opacity: 0.75 }}>To Class</label>
+                    <select
+                      className="form-control"
+                      defaultValue="12"
+                      onChange={e => updateForm('classRangeMax', parseInt(e.target.value))}
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(cls => (
+                        <option key={cls} value={cls}>Class {cls}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.78rem', opacity: 0.6, marginTop: '0.4rem' }}>This affects your compatibility score with students.</p>
               </div>
             </>
           )}

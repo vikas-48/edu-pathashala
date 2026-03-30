@@ -1,4 +1,5 @@
 const express = require('express');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const User = require('../models/User');
 const Content = require('../models/Content');
@@ -6,12 +7,15 @@ const Progress = require('../models/Progress');
 const Doubt = require('../models/Doubt');
 const Session = require('../models/Session');
 const Match = require('../models/Match');
+const AIContent = require('../models/AIContent');
 const { 
   generateMentorSuggestion, 
   generateLearningPlan, 
   calculateCompatibilityScore, 
   getTopMatchesForStudent 
 } = require('../services/engines');
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const router = express.Router();
 
@@ -56,7 +60,7 @@ router.get('/mentor/students/:id', async (req, res) => {
         const mentor = await User.findById(req.params.id).populate('studentsAssigned');
         const studentsWithInsights = await Promise.all(mentor.studentsAssigned.map(async (student) => {
             // Get latest progress
-            const latestProgress = await Progress.findOne({ studentId: student._id }).sort({ date: -1 });
+            const latestProgress = await Progress.findOne({ studentId: student._id }).sort({ createdAt: -1 });
             const suggestions = latestProgress ? generateMentorSuggestion(latestProgress) : [];
             
             return {
@@ -295,12 +299,58 @@ router.post('/admin/assign', async (req, res) => {
     }
 });
 
-// Mentor: Get upcoming Sessions
+// Mentor: Get upcoming Sessions (Dynamically scheduled starting Saturday)
 router.get('/sessions/mentor/:mentorId', async (req, res) => {
     try {
-        const sessions = await Session.find({ mentorId: req.params.mentorId }).populate('studentId', 'name learningLevel');
-        res.json(sessions);
+        const mentor = await User.findById(req.params.mentorId).populate('studentsAssigned');
+        if (!mentor) return res.status(404).json({ error: 'Mentor not found' });
+
+        // Calculate next Saturday
+        const getNextSaturday = () => {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          const day = d.getDay(); // 0 (Sun) to 6 (Sat)
+          const diff = (6 - day + 7) % 7 || 7; 
+          d.setDate(d.getDate() + diff);
+          return d;
+        };
+
+        const startDate = getNextSaturday();
+        const schedule = [];
+        const slotsTaken = new Set(); // To handle "two or more same time -> next day" rule
+
+        for (const student of mentor.studentsAssigned) {
+          const preferredTime = student.timeSlot || '4-5 PM';
+          let daysOffset = 0;
+          
+          // Find first available day for this time slot
+          while (slotsTaken.has(`${daysOffset}-${preferredTime}`)) {
+            daysOffset++;
+          }
+          
+          slotsTaken.add(`${daysOffset}-${preferredTime}`);
+
+          const sessionDate = new Date(startDate);
+          sessionDate.setDate(sessionDate.getDate() + daysOffset);
+
+          schedule.push({
+            _id: `temp-${student._id}`,
+            studentId: { 
+              _id: student._id, 
+              name: student.name, 
+              learningLevel: student.learningLevel,
+              timeSlot: student.timeSlot 
+            },
+            date: sessionDate, // This will show as 'Next Sat', 'Next Sun', etc.
+            topic: student.subject || 'Weekly Review',
+            status: 'Scheduled',
+            time: preferredTime
+          });
+        }
+
+        res.json(schedule);
     } catch (error) {
+        console.error('Session schedule error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -321,6 +371,153 @@ router.get('/admin/reports', async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+});
+
+
+// ==========================================
+// AI CONTENT & QUIZ GENERATION
+// ==========================================
+
+// Helper: build a Gemini prompt tailored to student profile
+function buildPrompt(topic, classGrade, level) {
+  const difficultyMap = {
+    Beginner:     'Use very simple language, short sentences, real-life examples and analogies. Generate 4 MCQ questions with 3 options each.',
+    Intermediate: 'Use clear explanations with concept + application examples. Generate 5 MCQ questions with 4 options each.',
+    Advanced:     'Use precise academic language, include edge cases and tricky scenarios. Generate 6 challenging MCQ questions with 4 options each.'
+  };
+  const instruction = difficultyMap[level] || difficultyMap['Beginner'];
+
+  return `You are an expert Indian school teacher for Class ${classGrade} students.
+The student's current performance level is: ${level}.
+Topic to teach: "${topic}".
+
+${instruction}
+
+Return ONLY valid JSON in this exact format (no markdown, no extra text):
+{
+  "lessonContent": "<a concise but thorough lesson explanation, 150-250 words>",
+  "quiz": [
+    {
+      "question": "<question text>",
+      "options": ["<option A>", "<option B>", "<option C>"],
+      "correctIndex": 0
+    }
+  ]
+}`;
+}
+
+// POST /api/ai/generate-content
+// Mentor triggers AI content generation for a specific student
+router.post('/ai/generate-content', async (req, res) => {
+  try {
+    const { studentId, mentorId, topic } = req.body;
+    if (!studentId || !mentorId || !topic) {
+      return res.status(400).json({ error: 'studentId, mentorId and topic are required' });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const classGrade   = student.classGrade   || 5;
+    const level        = student.learningLevel || 'Beginner';
+    const prompt       = buildPrompt(topic, classGrade, level);
+
+    // Call Gemini
+    const model  = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    const raw    = result.response.text().trim();
+
+    // Strip markdown code fences if present
+    const jsonStr = raw.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed  = JSON.parse(jsonStr);
+
+    // Save to DB
+    const aiContent = await AIContent.create({
+      studentId,
+      mentorId,
+      topic,
+      classGrade,
+      level,
+      lessonContent: parsed.lessonContent,
+      quiz:          parsed.quiz
+    });
+
+    res.status(201).json(aiContent);
+  } catch (error) {
+    console.error('AI generation error:', error.message);
+    res.status(500).json({ error: 'AI generation failed: ' + error.message });
+  }
+});
+
+// GET /api/ai/student-content/:studentId
+// Student fetches their assigned AI lessons
+router.get('/ai/student-content/:studentId', async (req, res) => {
+  try {
+    const contents = await AIContent.find({ studentId: req.params.studentId })
+      .sort({ assignedAt: -1 });
+    res.json(contents);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/ai/submit-quiz
+// Student submits answers; scores quiz and updates learningLevel
+router.post('/ai/submit-quiz', async (req, res) => {
+  try {
+    const { aiContentId, studentId, answers } = req.body;
+    const aiContent = await AIContent.findById(aiContentId);
+    if (!aiContent) return res.status(404).json({ error: 'Content not found' });
+    if (aiContent.completed) return res.status(400).json({ error: 'Quiz already submitted' });
+
+    // Score: percentage of correct answers
+    let correct = 0;
+    aiContent.quiz.forEach((q, i) => {
+      if (answers[i] === q.correctIndex) correct++;
+    });
+    const score = Math.round((correct / aiContent.quiz.length) * 100);
+
+    // Save quiz result
+    aiContent.studentAnswers = answers;
+    aiContent.quizScore      = score;
+    aiContent.completed      = true;
+    aiContent.completedAt    = new Date();
+    await aiContent.save();
+
+    // Save progress record
+    await Progress.create({
+      studentId,
+      mentorId:    aiContent.mentorId,
+      topicId:     aiContent._id,   // use aiContent as a ref proxy
+      attended:    true,
+      quizScore:   score,
+      understanding: Math.min(5, Math.ceil(score / 20)),
+      engagement:  4,
+      confidence:  score >= 60 ? 4 : 2
+    });
+
+    // Auto-update learningLevel based on score
+    const student      = await User.findById(studentId);
+    const currentLevel = student.learningLevel;
+    let newLevel       = currentLevel;
+
+    if (score >= 80) {
+      if (currentLevel === 'Beginner')     newLevel = 'Intermediate';
+      else if (currentLevel === 'Intermediate') newLevel = 'Advanced';
+    } else if (score < 40) {
+      if (currentLevel === 'Advanced')     newLevel = 'Intermediate';
+      else if (currentLevel === 'Intermediate') newLevel = 'Beginner';
+    }
+
+    if (newLevel !== currentLevel) {
+      await User.findByIdAndUpdate(studentId, { learningLevel: newLevel });
+    }
+
+    res.json({ score, newLevel, levelChanged: newLevel !== currentLevel });
+  } catch (error) {
+    console.error('Quiz submit error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

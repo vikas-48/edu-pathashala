@@ -89,20 +89,6 @@ export default function Login() {
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Login As (Override)</label>
-            <select 
-               className="form-control" 
-               value={selectedRole} 
-               onChange={(e) => setSelectedRole(e.target.value)}
-               style={{ opacity: 0.8 }}
-            >
-              <option value="Student">Student</option>
-              <option value="Mentor">Mentor</option>
-              <option value="Admin">NGO Admin (Special Access)</option>
-            </select>
-          </div>
-          
           <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={loading}>
             {loading ? 'Authenticating...' : 'Sign In Now'} <LogIn size={18} />
           </button>
@@ -111,39 +97,18 @@ export default function Login() {
              <p style={{ fontSize: '0.85rem' }}>New to platform? <Link to="/signup" style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>Create account</Link></p>
           </div>
         </form>
-        
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
            <button 
-             onClick={() => setShowDemo(!showDemo)}
-             style={{ background: 'none', border: 'none', color: 'var(--primary-hover)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem', marginBottom: '1rem' }}
+             onClick={() => {
+               const p = prompt('Enter Admin Password:');
+               if (p === 'youngistaan') navigate('/admin');
+               else if (p) alert('Access Denied');
+             }}
+             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem', opacity: 0.6 }}
            >
-             {showDemo ? 'Hide Quick Login' : 'Try Quick Login (Demo)'}
+             NGO Administrative Portal Access
            </button>
-           
-           {showDemo && (
-             <div className="animate-slide-up" style={{ textAlign: 'left', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', fontSize: '0.85rem' }}>
-                {demoAccounts.map(acc => (
-                  <div key={acc.email} style={{ marginBottom: '10px', cursor: 'pointer', padding: '5px', borderRadius: '4px' }} 
-                       onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
-                       onMouseLeave={(e) => e.target.style.background = 'transparent'}
-                       onClick={() => { 
-                         setEmail(acc.email); 
-                         setPassword(acc.pass); 
-                         setSelectedRole(acc.role); 
-                       }}>
-                    <strong style={{ color: 'var(--primary-color)', display: 'block' }}>{acc.role} Account</strong>
-                    <span>{acc.email} / {acc.pass}</span>
-                  </div>
-                ))}
-             </div>
-           )}
         </div>
-      </div>
-
-      {/* Developer Quick Links */}
-      <div style={{ position: 'fixed', bottom: '20px', left: '20px', display: 'flex', gap: '10px' }}>
-          <button onClick={() => navigate('/admin')} style={{ padding: '5px 10px', fontSize: '10px', opacity: 0.5 }}>Go Admin</button>
-          <button onClick={() => navigate('/student')} style={{ padding: '5px 10px', fontSize: '10px', opacity: 0.5 }}>Go Student</button>
       </div>
     </div>
   );
