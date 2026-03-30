@@ -1,0 +1,16 @@
+name,email,role,password,subject,subjects,language,languages,timeSlot,timeSlotMentor,learningLevel,preferredStyle,teachingStyle,effectiveness
+Lakshmi K,lakshmi.k@example.com,Student,pass123,Math,,Telugu,,5-6 PM,,Advanced,Interactive,,
+Karan D,karan.d@example.com,Student,pass123,Math,,English,,6-7 PM,,Beginner,Interactive,,
+Manoj V,manoj.v@example.com,Student,pass123,English,,Hindi,,6-7 PM,,Beginner,Visual,,
+Aisha F,aisha.f@example.com,Student,pass123,Science,,English,,5-6 PM,,Intermediate,Theory,,
+Bhavya T,bhavya.t@example.com,Student,pass123,Science,,Telugu,,6-7 PM,,Intermediate,Visual,,
+Suresh P,suresh.p@example.com,Student,pass123,English,,Telugu,,5-6 PM,,Intermediate,Interactive,,
+Pooja M,pooja.m@example.com,Student,pass123,Science,,Hindi,,6-7 PM,,Beginner,Visual,,
+Gaurav S,gaurav.s@example.com,Student,pass123,Math,,English,,5-6 PM,,Intermediate,Interactive,,
+Riya N,riya.n@example.com,Student,pass123,Math,,Hindi,,6-7 PM,,Advanced,Theory,,
+Deepak B,deepak.b@example.com,Student,pass123,Science,,Telugu,,5-6 PM,,Advanced,Visual,,
+Dr. Hema R,hema.r@example.com,Mentor,pass123,,"Math",,"Telugu, English",,6-7 PM,,,Visual,0.92
+Ajay Gupta,ajay.g@example.com,Mentor,pass123,,"Science, English",,"Hindi, English",,5-6 PM,,,Interactive,0.85
+Nisha Wankhede,nisha.w@example.com,Mentor,pass123,,"Math, Science",,"Hindi",,6-7 PM,,,Theory,0.89
+Sameer Das,sameer.d@example.com,Mentor,pass123,,"English",,"Telugu, Hindi",,5-6 PM,,,Visual,0.94
+Vani S,vani.s@example.com,Mentor,pass123,,"Match, Science",,"English, Hindi",,5-6 PM,,,Interactive,0.97
