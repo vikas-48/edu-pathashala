@@ -16,10 +16,12 @@ export default function StudentDashboard() {
   const [profileForm, setProfileForm] = useState({ name: '', email: '', classGrade: '', subject: '' });
   const [lessons, setLessons] = useState([]);
   const [openLesson, setOpenLesson] = useState(null);
+  const [quizMode, setQuizMode] = useState(false);
   const [userAnswers, setUserAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [upcomingSessions, setUpcomingSessions] = useState([]);
 
   const levelColor = { Beginner: '#22c55e', Intermediate: '#f59e0b', Advanced: '#6366f1' };
   const levelEmoji = { Beginner: '🌱', Intermediate: '📈', Advanced: '🚀' };
@@ -34,6 +36,10 @@ export default function StudentDashboard() {
       const resAI = await fetch(`http://127.0.0.1:5000/api/ai/lessons/${u._id}`);
       const jAI = await resAI.json();
       setLessons(Array.isArray(jAI) ? jAI : []);
+
+      const resSessions = await fetch(`http://127.0.0.1:5000/api/sessions/student/${u._id}`);
+      const jSessions = await resSessions.json();
+      setUpcomingSessions(Array.isArray(jSessions) ? jSessions : []);
     } catch (err) {
       console.error('Frontend error:', err);
     }
@@ -93,7 +99,7 @@ export default function StudentDashboard() {
 
   const logout = () => { localStorage.clear(); navigate('/login'); };
 
-  const chartData = data?.progress?.map((p, i) => ({ name: `Quiz ${i + 1}`, score: p.quizScore })).reverse() || [];
+  const chartData = [...(data?.progress || [])].reverse().map((p, i) => ({ name: `Quiz ${i + 1}`, score: p.quizScore }));
 
   const submitDoubt = async (type = 'text', textOverride) => {
     const question = textOverride || doubtText;
@@ -207,6 +213,29 @@ export default function StudentDashboard() {
                 </ResponsiveContainer>
               </div>
             ) : <p>No test data available yet.</p>}
+          </div>
+
+          {/* ── Upcoming Sessions ── */}
+          <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem' }}>
+              <Calendar size={24} color="var(--primary-color)" /> My Upcoming Sessions
+            </h2>
+            {upcomingSessions.length === 0 ? (
+              <p style={{ opacity: 0.6 }}>No sessions scheduled yet. Check back soon!</p>
+            ) : (
+              <div className="grid-cols-3" style={{ gap: '1rem' }}>
+                {upcomingSessions.map((session, idx) => (
+                  <div key={idx} className="glass-panel" style={{ background: 'rgba(99, 102, 241, 0.03)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
+                    <h4 style={{ margin: 0, color: 'var(--primary-color)' }}>
+                      {new Date(session.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </h4>
+                    <p style={{ margin: '4px 0', fontWeight: 'bold', fontSize: '1.1rem' }}>{session.time}</p>
+                    <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.8 }}>Mentor: {session.mentorId?.name}</p>
+                    <p style={{ margin: '8px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Topic: {session.topic}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── AI Lessons from Mentor ── */}

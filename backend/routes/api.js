@@ -88,6 +88,26 @@ router.get('/mentor/students/:id', async (req, res) => {
     }
 });
 
+// Admin/Mentor: Get students by class grade with mentor and progress
+router.get('/students/class/:grade', async (req, res) => {
+    try {
+        const grade = parseInt(req.params.grade);
+        const students = await User.find({ role: 'Student', classGrade: grade }).populate('mentorId', 'name email');
+        
+        const studentsWithInsights = await Promise.all(students.map(async (student) => {
+            const latestProgress = await Progress.findOne({ studentId: student._id }).sort({ createdAt: -1 });
+            return {
+                student,
+                latestProgress
+            };
+        }));
+        
+        res.json(studentsWithInsights);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Student Dashboard: Get learning plan and progress
 router.get('/student/dashboard/:id', async (req, res) => {
     try {
@@ -213,7 +233,11 @@ router.post('/admin/bulk-upload', async (req, res) => {
             for (const suggestion of topMentors) {
                 await Match.findOneAndUpdate(
                     { studentId: student._id, mentorId: suggestion.mentorId },
-                    { score: suggestion.score / 100, status: 'pending' },
+                    { 
+                        score: suggestion.score / 100, 
+                        factors: suggestion.factors,
+                        status: 'pending' 
+                    },
                     { upsert: true, new: true }
                 );
                 matchCount++;
@@ -239,7 +263,11 @@ router.post('/admin/run-matching', async (req, res) => {
                 // Upsert match so we don't duplicate
                 const match = await Match.findOneAndUpdate(
                     { studentId: student._id, mentorId: suggestion.mentorId },
-                    { score: suggestion.score / 100, status: 'pending' },
+                    { 
+                        score: suggestion.score / 100, 
+                        factors: suggestion.factors,
+                        status: 'pending' 
+                    },
                     { upsert: true, new: true }
                 );
                 createdMatches.push(match);
@@ -340,6 +368,7 @@ router.post('/students', async (req, res) => {
                 studentId: student._id,
                 mentorId: suggestion.mentorId,
                 score: suggestion.score / 100,
+                factors: suggestion.factors,
                 status: 'pending'
             });
         }
@@ -380,14 +409,15 @@ router.post('/admin/assign', async (req, res) => {
 // Mentor: Get upcoming Sessions (Dynamically scheduled starting Saturday)
 router.get('/sessions/mentor/:mentorId', async (req, res) => {
     try {
-        const mentor = await User.findById(req.params.mentorId).populate('studentsAssigned');
+        const students = await User.find({ mentorId: req.params.mentorId, role: 'Student' }).sort({ _id: 1 });
+        const mentor = await User.findById(req.params.mentorId);
         if (!mentor) return res.status(404).json({ error: 'Mentor not found' });
 
         // Calculate next Saturday
         const getNextSaturday = () => {
           const d = new Date();
           d.setHours(0, 0, 0, 0);
-          const day = d.getDay(); // 0 (Sun) to 6 (Sat)
+          const day = d.getDay();
           const diff = (6 - day + 7) % 7 || 7; 
           d.setDate(d.getDate() + diff);
           return d;
@@ -395,13 +425,12 @@ router.get('/sessions/mentor/:mentorId', async (req, res) => {
 
         const startDate = getNextSaturday();
         const schedule = [];
-        const slotsTaken = new Set(); // To handle "two or more same time -> next day" rule
+        const slotsTaken = new Set();
 
-        for (const student of mentor.studentsAssigned) {
+        for (const student of students) {
           const preferredTime = student.timeSlot || '4-5 PM';
           let daysOffset = 0;
           
-          // Find first available day for this time slot
           while (slotsTaken.has(`${daysOffset}-${preferredTime}`)) {
             daysOffset++;
           }
@@ -419,7 +448,7 @@ router.get('/sessions/mentor/:mentorId', async (req, res) => {
               learningLevel: student.learningLevel,
               timeSlot: student.timeSlot 
             },
-            date: sessionDate, // This will show as 'Next Sat', 'Next Sun', etc.
+            date: sessionDate,
             topic: student.subject || 'Weekly Review',
             status: 'Scheduled',
             time: preferredTime
@@ -428,7 +457,60 @@ router.get('/sessions/mentor/:mentorId', async (req, res) => {
 
         res.json(schedule);
     } catch (error) {
-        console.error('Session schedule error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Student: Get upcoming session
+router.get('/sessions/student/:studentId', async (req, res) => {
+    try {
+        const student = await User.findById(req.params.studentId);
+        if (!student || !student.mentorId) return res.json([]);
+        
+        const students = await User.find({ mentorId: student.mentorId, role: 'Student' }).sort({ _id: 1 });
+        const mentor = await User.findById(student.mentorId);
+        if (!mentor) return res.json([]);
+
+        // Calculate next Saturday
+        const getNextSaturday = () => {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          const day = d.getDay();
+          const diff = (6 - day + 7) % 7 || 7; 
+          d.setDate(d.getDate() + diff);
+          return d;
+        };
+
+        const startDate = getNextSaturday();
+        const schedule = [];
+        const slotsTaken = new Set();
+
+        for (const assigned of students) {
+          const preferredTime = assigned.timeSlot || '4-5 PM';
+          let daysOffset = 0;
+          
+          while (slotsTaken.has(`${daysOffset}-${preferredTime}`)) {
+            daysOffset++;
+          }
+          
+          slotsTaken.add(`${daysOffset}-${preferredTime}`);
+
+          if (assigned._id.toString() === student._id.toString()) {
+            const sessionDate = new Date(startDate);
+            sessionDate.setDate(sessionDate.getDate() + daysOffset);
+            
+            schedule.push({
+              _id: `temp-${student._id}`,
+              mentorId: { name: mentor.name },
+              date: sessionDate,
+              topic: student.subject || 'Weekly Review',
+              status: 'Scheduled',
+              time: preferredTime
+            });
+          }
+        }
+        res.json(schedule);
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });

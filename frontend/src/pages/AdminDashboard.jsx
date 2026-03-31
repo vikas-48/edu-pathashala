@@ -1,18 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, BookOpen, TrendingUp, LogOut, AlertTriangle, UserPlus, Download, Check, X, Bell, Upload } from 'lucide-react';
+import { Users, BookOpen, TrendingUp, LogOut, AlertTriangle, UserPlus, Download, Check, X, Bell, Upload, RefreshCw } from 'lucide-react';
 import Papa from 'papaparse';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [pendingMatches, setPendingMatches] = useState([]);
+  const [class5Data, setClass5Data] = useState([]);
   const [loadingReport, setLoadingReport] = useState(false);
 
   useEffect(() => {
     fetchStats();
     fetchPendingMatches();
+    fetchClass5Data();
   }, []);
+
+  const fetchClass5Data = () => {
+    fetch('http://127.0.0.1:5000/api/students/class/5')
+      .then(res => res.json())
+      .then(data => setClass5Data(data));
+  };
 
   const fetchStats = () => {
     fetch('http://127.0.0.1:5000/api/admin/stats')
@@ -238,7 +246,21 @@ export default function AdminDashboard() {
 
           <div className="grid-cols-2">
             <div className="glass-panel">
-              <h2><AlertTriangle size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} color="var(--alert-red)" /> System Alerts</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ margin: 0 }}><AlertTriangle size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} color="var(--alert-red)" /> System Alerts</h2>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ fontSize: '0.85rem', padding: '6px 12px' }}
+                  onClick={async () => {
+                    const res = await fetch('http://127.0.0.1:5000/api/admin/run-matching', { method: 'POST' });
+                    const d = await res.json();
+                    alert(d.message);
+                    fetchPendingMatches();
+                  }}
+                >
+                  <RefreshCw size={14} /> Run AI Re-Match
+                </button>
+              </div>
               <p>Critical: {pendingMatches.length} pending mentor assignments require your approval.</p>
               <button className="btn btn-secondary">Review At-Risk Students</button>
             </div>
@@ -268,11 +290,31 @@ export default function AdminDashboard() {
                           </div>
                         </div>
 
-                        <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                          <small style={{ display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Suggested Mentor</small>
-                          <strong style={{ display: 'block', fontSize: '1rem' }}>{match.mentorId?.name}</strong>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--primary-hover)' }}>
-                             Style: {match.mentorId?.teachingStyle || 'N/A'} • Effectiveness: {match.mentorId?.effectiveness || 0.7}
+                        <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <small style={{ textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7, fontSize: '0.7rem' }}>Suggested Mentor</small>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--primary-color)', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                              <TrendingUp size={14} /> {(match.mentorId?.effectiveness * 100 || 85).toFixed(0)}% Eff.
+                            </div>
+                          </div>
+                          
+                          <strong style={{ display: 'block', fontSize: '1.1rem', marginBottom: '8px' }}>{match.mentorId?.name}</strong>
+                          
+                          {/* Factors Section */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {match.factors && match.factors.map((factor, i) => (
+                              <span key={i} style={{ 
+                                fontSize: '0.7rem', 
+                                padding: '2px 8px', 
+                                background: 'var(--primary-light)', 
+                                color: 'var(--primary-color)', 
+                                borderRadius: '4px',
+                                fontWeight: '600',
+                                border: '1px solid rgba(99, 102, 241, 0.1)'
+                              }}>
+                                {factor}
+                              </span>
+                            ))}
                           </div>
                         </div>
 
@@ -298,6 +340,82 @@ export default function AdminDashboard() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* ── Class 5 Dropout Monitor ── */}
+          <div className="glass-panel mt-5" style={{ position: 'relative', overflow: 'hidden', borderTop: '4px solid var(--alert-red)' }}>
+            <div style={{ position: 'absolute', top: '-10%', right: '-5%', opacity: 0.04, transform: 'rotate(15deg)' }}>
+              <AlertTriangle size={150} />
+            </div>
+
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--alert-red)', margin: '0 0 5px 0' }}>
+              <AlertTriangle size={24} /> High-Risk Group: Class 5 Tracker
+            </h2>
+            <p style={{ opacity: 0.8, marginTop: 0, marginBottom: '20px', fontSize: '0.95rem' }}>NGO tracking for all Class 5 students to prevent dropouts and analyze growth.</p>
+            
+            {class5Data.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '8px' }}>
+                <p style={{ margin: 0, color: 'var(--alert-red)' }}>No Class 5 students found.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto', background: 'var(--bg-color)', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(239, 68, 68, 0.05)' }}>
+                      <th style={{ padding: '16px 20px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary-color)', borderBottom: '2px solid rgba(239, 68, 68, 0.2)' }}>Student Name</th>
+                      <th style={{ padding: '16px 20px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary-color)', borderBottom: '2px solid rgba(239, 68, 68, 0.2)' }}>Mentor</th>
+                      <th style={{ padding: '16px 20px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary-color)', borderBottom: '2px solid rgba(239, 68, 68, 0.2)' }}>Level</th>
+                      <th style={{ padding: '16px 20px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary-color)', borderBottom: '2px solid rgba(239, 68, 68, 0.2)' }}>Score</th>
+                      <th style={{ padding: '16px 20px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary-color)', borderBottom: '2px solid rgba(239, 68, 68, 0.2)' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {class5Data.map((item, index) => {
+                      const levelColor = { Beginner: '#22c55e', Intermediate: '#f59e0b', Advanced: '#6366f1' };
+                      const isAtRisk = item.latestProgress && item.latestProgress.quizScore < 40;
+                      return (
+                      <tr key={index} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.02)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{item.student.name}</td>
+                        <td style={{ padding: '16px 20px' }}>
+                          {item.student.mentorId ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--primary-color)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                {item.student.mentorId.name.charAt(0).toUpperCase()}
+                              </div>
+                              {item.student.mentorId.name}
+                            </div>
+                          ) : <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--alert-red)' }}>Unassigned</span>}
+                        </td>
+                        <td style={{ padding: '16px 20px' }}>
+                          <span className="badge" style={{ background: levelColor[item.student.learningLevel] + '22', color: levelColor[item.student.learningLevel], padding: '6px 10px' }}>
+                            {item.student.learningLevel}
+                          </span>
+                        </td>
+                        <td style={{ padding: '16px 20px' }}>
+                          {item.latestProgress ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '50px', height: '6px', background: 'rgba(0,0,0,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${item.latestProgress.quizScore}%`, background: isAtRisk ? 'var(--alert-red)' : 'var(--primary-color)' }}></div>
+                              </div>
+                              <span style={{ color: isAtRisk ? 'var(--alert-red)' : 'var(--primary-color)', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                {item.latestProgress.quizScore}%
+                              </span>
+                            </div>
+                          ) : <span style={{ opacity: 0.5, fontSize: '0.85rem', fontStyle: 'italic' }}>No data</span>}
+                        </td>
+                        <td style={{ padding: '16px 20px' }}>
+                          {item.latestProgress ? (
+                            isAtRisk ? 
+                              <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--alert-red)' }}><AlertTriangle size={14} /> At Risk</span> :
+                              <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}><TrendingUp size={14} /> Growing</span>
+                          ) : <span style={{ opacity: 0.5 }}>-</span>}
+                        </td>
+                      </tr>
+                    )})}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}

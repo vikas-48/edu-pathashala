@@ -94,40 +94,47 @@ function generateLearningPlan(topic, lastScore) {
  */
 function calculateCompatibilityScore(student, mentor) {
   let score = 0;
+  const factors = [];
 
-  // 1. Subject (25 points) - Mentor should have student's subject in their list
+  // 1. Subject (25 points)
   if (mentor.subjects && mentor.subjects.includes(student.subject)) {
     score += 25;
+    factors.push('Subject Expertise');
   }
 
-  // 2. Time Slot (15 points) - Direct match
+  // 2. Time Slot (15 points)
   if (mentor.timeSlotMentor === student.timeSlot) {
     score += 15;
+    factors.push('Schedule Alignment');
   }
 
-  // 3. Language (15 points) - Mentor should speak student's primary language
+  // 3. Language (15 points)
   if (mentor.languages && mentor.languages.includes(student.language)) {
     score += 15;
+    factors.push('Language Compatibility');
   }
 
-  // 4. Teaching Style (15 points) - Student's preferred style vs Mentor's style
+  // 4. Teaching Style (15 points)
   if (mentor.teachingStyle === student.preferredStyle) {
     score += 15;
+    factors.push('Style Preference');
   }
 
-  // 5. Effectiveness (15 points max) - Based on mentor.effectiveness (0.0 to 1.0)
+  // 5. Effectiveness (15 points max)
   const eff = mentor.effectiveness || 0.7;
   score += (eff * 15);
+  if (eff >= 0.8) factors.push('High Mentor Effectiveness');
 
-  // 6. Class Range (15 points) - Mentor covers the student's class grade
+  // 6. Class Range (15 points)
   const studentClass = student.classGrade || 1;
   const minClass = mentor.classRangeMin || 1;
   const maxClass = mentor.classRangeMax || 12;
   if (studentClass >= minClass && studentClass <= maxClass) {
     score += 15;
+    factors.push('Grade Level Match');
   }
 
-  return Math.round(score);
+  return { score: Math.round(score), factors };
 }
 
 /**
@@ -135,13 +142,17 @@ function calculateCompatibilityScore(student, mentor) {
  */
 function getTopMatchesForStudent(student, mentors) {
   return mentors
-    .map(mentor => ({
-      mentorId: mentor._id,
-      mentorName: mentor.name,
-      score: calculateCompatibilityScore(student, mentor)
-    }))
-    .sort((a, b) => b.score - a.score) // Highest score first
-    .slice(0, 3); // Get top 3
+    .map(mentor => {
+      const { score, factors } = calculateCompatibilityScore(student, mentor);
+      return {
+        mentorId: mentor._id,
+        mentorName: mentor.name,
+        score,
+        factors
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
 }
 
 module.exports = {
