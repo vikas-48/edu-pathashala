@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, UserCheck, AlertCircle, TrendingUp, CheckCircle, Edit3, Calendar, HelpCircle, MessageSquare, MessageCircle, Sparkles, BookOpen, Send, Loader, XCircle, User, Settings, Edit2, Award } from 'lucide-react';
+import { LogOut, UserCheck, AlertCircle, TrendingUp, CheckCircle, Edit, Edit3, Calendar, HelpCircle, MessageSquare, MessageCircle, Sparkles, BookOpen, Send, Loader, XCircle, User, Settings, Edit2, Award } from 'lucide-react';
 
 export default function MentorDashboard() {
   const navigate = useNavigate();
@@ -20,6 +20,8 @@ export default function MentorDashboard() {
   const [genLoading, setGenLoading] = useState(false);
   const [genResult, setGenResult] = useState(null); // { lessonContent, quiz[], _id }
   const [genError, setGenError] = useState('');
+  const [editingNotesId, setEditingNotesId] = useState(null);
+  const [tempNotes, setTempNotes] = useState('');
   
   const [showProfile, setShowProfile] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -31,121 +33,65 @@ export default function MentorDashboard() {
   const [isEditingCurriculum, setIsEditingCurriculum] = useState(false);
   const [curriculumText, setCurriculumText] = useState('');
   const [curriculumData, setCurriculumData] = useState({
-    'Class 1-5 (Primary)': {
-      Math: [
-        'Number Sense & Place Value (up to 1000)', 
-        'Addition & Subtraction (Strategies & Word Problems)', 
-        'Multiplication & Division Intro (Times Tables 1-10)', 
-        'Fractions (Halves, Thirds, Fourths)', 
-        'Basic Geometry (2D & 3D Shapes, Symmetry)', 
-        'Measurements (Length, Weight, Capacity, Time)', 
-        'Data Handling (Pictographs, Bar Graphs)'
-      ],
-      Science: [
-        'Living vs. Non-Living Things', 
-        'Human Body: Organs & Senses', 
-        'Plant Life Cycle & Photosynthesis Basics', 
-        'Animals: Habitats & Food Chains', 
-        'Earth & Universe (Sun, Moon, Stars, Planets)', 
-        'Water Cycle & Weather Variations', 
-        'Basic Forces (Push & Pull, Friction Intro)'
-      ],
-      English: [
-        'Phonics & Word Reading Fluency', 
-        'Vocabulary Building (Synonyms, Antonyms, Homophones)', 
-        'Basic Grammar (Nouns, Verbs, Adjectives, Pronouns)', 
-        'Sentence Structure & Punctuation Marks', 
-        'Reading Comprehension (Short Stories, Folktales)', 
-        'Creative Writing (Short Paragraphs, Story Sequencing)', 
-        'Listening & Speaking (Roleplays, Recitation)'
-      ]
+    'Class 1': {
+      Math: ['Numbers 1-100', 'Basic Shapes', 'Addition (Single Digit)'],
+      Science: ['Body Parts', 'Fruits & Vegetables', 'Domestic Animals'],
+      English: ['Capital ABC', 'Phonics: A to Z', 'Vowels: a, e, i, o, u']
     },
-    'Class 6-8 (Middle)': {
-      Math: [
-        'Fractions, Decimals, & Percentages (Operations & Equivalency)', 
-        'Integers & Rational Numbers', 
-        'Linear Equations & Introduction to Algebra', 
-        'Ratio, Proportion, & Unitary Method', 
-        'Geometry (Lines, Angles, Triangles, Quadrilaterals)', 
-        'Mensuration (Area & Perimeter of 2D shapes, Volume Intro)', 
-        'Statistics (Mean, Median, Mode)'
-      ],
-      Science: [
-        'Components of Food & Human Digestion', 
-        'Structure of Matter (Atoms, Molecules, Elements)', 
-        'Force, Work, Energy, & Pressure', 
-        'Light (Reflection, Refraction) & Sound', 
-        'Microorganisms: Friend & Foe', 
-        'Electricity (Circuits, Conductors, Insulators)', 
-        'Environmental Science (Pollution, Conservation, Magnetism)'
-      ],
-      English: [
-        'Advanced Grammar (Tenses, Active/Passive Voice, Direct/Indirect Speech)', 
-        'Vocabulary Expansion (Idioms, Phrases, Root Words)', 
-        'Reading Comprehension (Poetry, Expository Texts)', 
-        'Formal & Informal Letter Writing', 
-        'Essay Writing & Paragraph Expansion', 
-        'Notice & Diary Entry Writing', 
-        'Debate, Extempore, & Group Discussions'
-      ]
+    'Class 2': {
+      Math: ['Numbers up to 500', 'Ordinal Numbers', 'Subtraction (Single Digit)'],
+      Science: ['Types of Plants', 'Wild Animals', 'Our Senses'],
+      English: ['Small abc', 'Rhyming Words', 'Naming Words (Nouns)']
     },
-    'Class 9-10 (High)': {
-      Math: [
-        'Real Numbers, Polynomials, & Quadratic Equations', 
-        'Trigonometry (Ratios, Identities, Heights & Distances)', 
-        'Linear Equations in Two Variables', 
-        'Coordinate Geometry', 
-        'Circles, Tangents, & Theorems', 
-        'Surface Areas & Volumes (3D Solids, Frustum)', 
-        'Probability & Advanced Statistics'
-      ],
-      Science: [
-        'Chemical Reactions & Equations', 
-        'Acids, Bases, & Salts / Metals & Non-Metals', 
-        'Life Processes (Respiration, Circulation, Excretion)', 
-        'Control & Coordination (Nervous & Endocrine Systems)', 
-        'Heredity & Evolution Intro', 
-        'Electricity, Magnetism & Electromagnetism', 
-        'Light (Mirrors, Lenses, Human Eye, Prism)'
-      ],
-      English: [
-        'Complex Grammar & Editing (Clauses, Modals, Determiners)', 
-        'Analyzing Literature (Themes, Character Sketches, Plot)', 
-        'Reading Comprehension (Unseen Passages, Articles)', 
-        'Analytical Paragraphs & Article Writing', 
-        'Writing Speeches & Debates', 
-        'Story Writing (Setting, Climax, Resolution)', 
-        'Listening & Speaking Assessments (ASL)'
-      ]
+    'Class 3': {
+      Math: ['Place Value (1000s)', 'Multiplication Basics', 'Time (Hours)'],
+      Science: ['Parts of a Plant', 'Living vs Non-Living', 'Water Cycle Intro'],
+      English: ['Action Words (Verbs)', 'Pronouns', 'Story Reading']
     },
-    'Class 11-12 (Senior)': {
-      Math: [
-        'Sets, Relations, & Functions', 
-        'Calculus (Limits, Continuity, Differentiation, Integration)', 
-        'Algebra (Matrices, Determinants, Permutations & Combinations)', 
-        'Vectors & 3D Geometry', 
-        'Conic Sections (Parabola, Ellipse, Hyperbola)', 
-        'Complex Numbers', 
-        'Linear Programming & Advanced Probability'
-      ],
-      Science: [
-        'Physics: Kinematics, Thermodynamics, Quantum Mechanics', 
-        'Physics: Electromagnetism, Optics, Modern Physics', 
-        'Chemistry: Organic (Hydrocarbons, Polymers), Inorganic (s,p,d,f blocks)', 
-        'Chemistry: Physical Chemistry (Kinetics, Solutions)', 
-        'Biology: Genetics, Molecular Basis of Inheritance', 
-        'Biology: Human Physiology, Biotechnology, Ecology', 
-        'Computer Science Intro (Algorithms, Data Structures)'
-      ],
-      English: [
-        'In-depth Literary Critique & Central Ideologies', 
-        'Note-making & Summarising', 
-        'Report Writing (Newspapers, School Magazines)', 
-        'Job Applications, Invitations, & Replies', 
-        'Argumentative & Discursive Essays', 
-        'Advanced Reading Skills (Scholarly Articles)', 
-        'Extensive Speaking (Seminars, Presentations)'
-      ]
+    'Class 4': {
+      Math: ['Division Intro', 'Fractions (Halves)', 'Money Concepts'],
+      Science: ['Force & Motion', 'The Human Skeleton', 'Food Chains'],
+      English: ['Adjectives', 'Sentence Formation', 'Reading Short Stories']
+    },
+    'Class 5': {
+      Math: ['L.C.M & H.C.F', 'Decimals Intro', 'Area & Perimeter'],
+      Science: ['Photosynthesis', 'Human Digestive System', 'Planets'],
+      English: ['Prepositions', 'Subject-Verb Agreement', 'Creative Writing']
+    },
+    'Class 6': {
+      Math: ['Integers', 'Ratios & Proportions', 'Basic Algebra'],
+      Science: ['Components of Food', 'Sorting Materials', 'Separating Substances'],
+      English: ['Determiners', 'Direct & Indirect Speech', 'Letter Writing']
+    },
+    'Class 7': {
+      Math: ['Algebraic Expressions', 'Symmetry', 'Data Handling'],
+      Science: ['Nutrition in Plants', 'Heat & Temperature', 'Acids and Bases'],
+      English: ['Active & Passive Voice', 'Idioms', 'Summary Writing']
+    },
+    'Class 8': {
+      Math: ['Rational Numbers', 'Squares & Roots', 'Exponents'],
+      Science: ['Microorganisms', 'Metals & Non-metals', 'Force & Pressure'],
+      English: ['Tenses (Past, Present, Future)', 'Essay Writing', 'Notice Writing']
+    },
+    'Class 9': {
+      Math: ['Polynomials', 'Euclidian Geometry', 'Surface Areas'],
+      Science: ['Matter in Our Surroundings', 'Tissue Structure', 'Motion & Gravitation'],
+      English: ['Reporting Speeches', 'Modals', 'Literary Analysis']
+    },
+    'Class 10': {
+      Math: ['Trigonometry', 'Real Numbers', 'Probability'],
+      Science: ['Chemical Reactions', 'Life Processes', 'Electricity'],
+      English: ['Complex Grammar', 'Character Sketches', 'Board Prep English']
+    },
+    'Class 11': {
+      Math: ['Sets & Functions', 'Calculus (Limits)', 'Complex Numbers'],
+      Science: ['Kinematics', 'Organic Chemistry', 'Cell Biology'],
+      English: ['Job Applications', 'Debate Writing', 'Critique Methods']
+    },
+    'Class 12': {
+      Math: ['Integration', 'Matrices & Determinants', '3D Geometry'],
+      Science: ['Optics', 'Hydrocarbons', 'Genetics & Evolution'],
+      English: ['Note-making', 'Scholarly Articles', 'Final Exam English']
     }
   });
 
@@ -312,6 +258,27 @@ export default function MentorDashboard() {
     setGenLoading(false);
   };
 
+  const saveSessionNotes = async (session) => {
+    try {
+      const res = await fetch('http://127.0.0.1:5000/api/sessions/save-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mentorId: user._id,
+          studentId: session.studentId._id,
+          date: session.date,
+          time: session.time || session.studentId?.timeSlot || '4-5 PM',
+          topic: session.topic,
+          notes: tempNotes
+        })
+      });
+      if (res.ok) {
+        setEditingNotesId(null);
+        loadData(user);
+      }
+    } catch (e) {}
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -323,7 +290,8 @@ export default function MentorDashboard() {
   const levelColor = { Beginner: '#22c55e', Intermediate: '#f59e0b', Advanced: '#6366f1' };
 
   return (
-    <div className="container animate-fade-in">
+    <>
+      <div className="container animate-fade-in">
       <div 
         className="dashboard-header glass-panel" 
         style={{ 
@@ -344,7 +312,7 @@ export default function MentorDashboard() {
             <Award size={48} color="white" />
           </div>
           <div>
-            <h1 style={{ color: 'white', fontSize: '2.8rem', margin: '0 0 8px 0', textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>Volunteer Mentor Portal</h1>
+            <h1 style={{ color: 'white', fontSize: '2.8rem', margin: '0 0 8px 0', textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>Mentor Portal</h1>
             <p style={{ color: 'rgba(255,255,255,0.95)', margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Sparkles size={20} color="#facc15" />
               <span>{getGreeting()}, <strong style={{color: 'white', fontWeight: 700, letterSpacing: '0.5px'}}>{formattedName}</strong>! Ready to inspire today?</span>
@@ -371,17 +339,115 @@ export default function MentorDashboard() {
         {sessions.length === 0 ? <p>No scheduled sessions.</p> : (
           <div className="grid-cols-3">
             {sessions.filter(s => s.status === 'Scheduled').map(session => (
-              <div className="glass-panel" key={session._id}>
-                <h4 style={{ margin: 0, color: 'var(--primary-color)' }}>
-                  {`${new Date(session.date).toDateString()} | ${session.time || session.studentId?.timeSlot || '4-5 PM'}`}
-                </h4>
-                <p style={{ margin: 0, fontWeight: 'bold', fontSize: '1.1rem' }}>{session.studentId?.name}</p>
-                <p style={{ margin: 0 }}>Topic: {session.topic}</p>
-                <button className="btn btn-primary mt-2" style={{ width: '100%' }}>Start Session</button>
+              <div className="glass-panel" key={session._id} style={{ position: 'relative', overflow: 'visible' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h4 style={{ margin: 0, color: 'var(--primary-color)', fontSize: '0.9rem' }}>
+                      {`${new Date(session.date).toDateString()} | ${session.time || session.studentId?.timeSlot || '4-5 PM'}`}
+                    </h4>
+                    <p style={{ margin: '4px 0', fontWeight: 'bold', fontSize: '1.2rem' }}>{session.studentId?.name}</p>
+                    <p style={{ margin: 0, opacity: 0.8, fontSize: '0.9rem' }}>Topic: <strong>{session.topic}</strong></p>
+                  </div>
+                  <Calendar size={20} opacity={0.3} />
+                </div>
+
+                {session.preSessionNotes && editingNotesId !== session._id && (
+                  <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '8px', borderLeft: '3px solid var(--primary-color)' }}>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-main)', opacity: 0.9 }}>
+                      <strong>📝 Notes:</strong> {session.preSessionNotes}
+                    </p>
+                  </div>
+                )}
+
+                {editingNotesId === session._id ? (
+                  <div style={{ marginTop: '12px' }}>
+                    <textarea 
+                      className="form-control" 
+                      value={tempNotes} 
+                      onChange={e => setTempNotes(e.target.value)}
+                      placeholder="What do you want to cover in this session?"
+                      style={{ fontSize: '0.85rem', padding: '8px', minHeight: '80px', marginBottom: '8px' }}
+                      autoFocus
+                    />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="btn btn-primary" style={{ flex: 1, padding: '4px' }} onClick={() => saveSessionNotes(session)}>Save</button>
+                      <button className="btn btn-secondary" style={{ flex: 1, padding: '4px' }} onClick={() => setEditingNotesId(null)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button 
+                    className="btn btn-secondary mt-3" 
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    onClick={() => {
+                      setEditingNotesId(session._id);
+                      setTempNotes(session.preSessionNotes || '');
+                    }}
+                  >
+                    <Edit size={16} /> {session.preSessionNotes ? 'Edit Prep Notes' : 'Add Prep Notes'}
+                  </button>
+                )}
               </div>
             ))}
           </div>
         )}
+      </div>
+
+
+      </div>
+
+      {/* ── Assigned Students ── */}
+      <div className="container animate-fade-in">
+        {!data ? <p>Loading data...</p> : (
+        <div className="grid-cols-2">
+          {data.map((item, index) => (
+            <div className="glass-panel" key={index}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserCheck size={20} color="var(--primary-color)" /> {item.student.name}
+                </h3>
+                <span className="badge badge-success" style={{ background: levelColor[item.student.learningLevel] + '22', color: levelColor[item.student.learningLevel] }}>
+                  {item.student.learningLevel}
+                </span>
+              </div>
+
+              <div className="mb-3">
+                <p style={{ margin: 0 }}><strong>🏫 Class:</strong> {item.student.classGrade ? `Class ${item.student.classGrade}` : 'N/A'}</p>
+                <p style={{ margin: 0 }}><strong>📚 Learning Subject:</strong> {item.student.subject || 'Not Set'}</p>
+                <p style={{ margin: 0 }}><strong>📊 Latest Score:</strong> {item.latestProgress?.quizScore ?? 'N/A'}{item.latestProgress ? '%' : ''}</p>
+              </div>
+
+              <hr style={{ border: '0', borderTop: '1px solid rgba(0,0,0,0.05)', margin: '1rem 0' }} />
+
+              {/* Guidance */}
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>Guidance Suggestions</h4>
+              <div style={{ background: 'var(--bg-color)', padding: '12px', borderRadius: 'var(--border-radius-md)', marginBottom: '1rem' }}>
+                {item.suggestions && item.suggestions.length > 0 ? (
+                  item.suggestions.map((sug, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'flex-start' }}>
+                      {sug.type === 'Alert' ? <AlertCircle color="var(--alert-red)" size={18} style={{ marginTop: '3px' }} /> : <TrendingUp color="var(--primary-color)" size={18} style={{ marginTop: '3px' }} />}
+                      <div>
+                        <strong style={{ display: 'block', fontSize: '0.9rem', color: sug.type === 'Alert' ? 'var(--alert-red)' : 'var(--primary-color)' }}>Action: {sug.action}</strong>
+                        <span style={{ fontSize: '0.85rem' }}>{sug.message}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <span style={{ fontSize: '0.85rem' }}>No recent data. Please log progress.</span>
+                )}
+              </div>
+
+              {/* ✨ AI Lesson Button */}
+              <button
+                className="btn btn-primary"
+                style={{ width: '100%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                onClick={() => openGenPanel(item.student)}
+              >
+                <Sparkles size={16} /> Generate AI Lesson for {item.student.name}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       </div>
 
       {/* ── Floating Doubt Inbox (Message Icon) ── */}
@@ -441,63 +507,6 @@ export default function MentorDashboard() {
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* ── Assigned Students ── */}
-      <div className="mb-4">
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><UserCheck size={24} color="var(--primary-hover)" /> Your Assigned Students</h2>
-      </div>
-
-      {!data ? <p>Loading data...</p> : (
-        <div className="grid-cols-2">
-          {data.map((item, index) => (
-            <div className="glass-panel" key={index}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <UserCheck size={20} color="var(--primary-color)" /> {item.student.name}
-                </h3>
-                <span className="badge badge-success" style={{ background: levelColor[item.student.learningLevel] + '22', color: levelColor[item.student.learningLevel] }}>
-                  {item.student.learningLevel}
-                </span>
-              </div>
-
-              <div className="mb-3">
-                <p style={{ margin: 0 }}><strong>🏫 Class:</strong> {item.student.classGrade ? `Class ${item.student.classGrade}` : 'N/A'}</p>
-                <p style={{ margin: 0 }}><strong>📚 Learning Subject:</strong> {item.student.subject || 'Not Set'}</p>
-                <p style={{ margin: 0 }}><strong>📊 Latest Score:</strong> {item.latestProgress?.quizScore ?? 'N/A'}{item.latestProgress ? '%' : ''}</p>
-              </div>
-
-              <hr style={{ border: '0', borderTop: '1px solid rgba(0,0,0,0.05)', margin: '1rem 0' }} />
-
-              {/* Guidance */}
-              <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>Guidance Suggestions</h4>
-              <div style={{ background: 'var(--bg-color)', padding: '12px', borderRadius: 'var(--border-radius-md)', marginBottom: '1rem' }}>
-                {item.suggestions && item.suggestions.length > 0 ? (
-                  item.suggestions.map((sug, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'flex-start' }}>
-                      {sug.type === 'Alert' ? <AlertCircle color="var(--alert-red)" size={18} style={{ marginTop: '3px' }} /> : <TrendingUp color="var(--primary-color)" size={18} style={{ marginTop: '3px' }} />}
-                      <div>
-                        <strong style={{ display: 'block', fontSize: '0.9rem', color: sug.type === 'Alert' ? 'var(--alert-red)' : 'var(--primary-color)' }}>Action: {sug.action}</strong>
-                        <span style={{ fontSize: '0.85rem' }}>{sug.message}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <span style={{ fontSize: '0.85rem' }}>No recent data. Please log progress.</span>
-                )}
-              </div>
-
-              {/* ✨ AI Lesson Button */}
-              <button
-                className="btn btn-primary"
-                style={{ width: '100%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-                onClick={() => openGenPanel(item.student)}
-              >
-                <Sparkles size={16} /> Generate AI Lesson for {item.student.name}
-              </button>
-            </div>
-          ))}
         </div>
       )}
 
@@ -775,6 +784,6 @@ export default function MentorDashboard() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

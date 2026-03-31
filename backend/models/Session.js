@@ -6,6 +6,7 @@ const SessionSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   topic: { type: String },
   status: { type: String, enum: ['Scheduled', 'Completed', 'Cancelled'], default: 'Scheduled' },
+  preSessionNotes: { type: String },
   attendance: { type: Boolean, default: false }, // marked true if completed and student attended
   feedbackNotes: { type: String }
 }, { timestamps: true });

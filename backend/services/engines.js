@@ -60,31 +60,131 @@ function generateMentorSuggestion(progress) {
   return suggestions;
 }
 
-/**
- * Generates a 5-day learning plan based on previous performance.
- */
-function generateLearningPlan(topic, lastScore) {
-  // If the last score was low, the plan should include revision.
+function generateLearningPlan(topic, lastScore, classGrade = 5) {
   const needsRevision = lastScore !== null && lastScore < 60;
+  const t = topic.topic || 'General Studies';
+  const rev = (act) => needsRevision ? `Revision: ${act}` : act;
 
-  if (needsRevision) {
+  // Granular Class-Wise Curriculum (Class 1 to 12)
+  if (classGrade === 1) {
     return [
-      { day: 1, activity: 'Concept Revision (Simplified)' },
-      { day: 2, activity: `Practice Basics of ${topic.topic}` },
-      { day: 3, activity: 'Interactive Activity / Game' },
-      { day: 4, activity: 'Follow-up Quiz' },
-      { day: 5, activity: 'Doubt Clearing Session' }
-    ];
-  } else {
-    // Normal / Good performance plan
-    return [
-      { day: 1, activity: `New Concept: ${topic.topic}` },
-      { day: 2, activity: 'Standard Practice Worksheet' },
-      { day: 3, activity: 'Group Activity' },
-      { day: 4, activity: 'Weekly Quiz' },
-      { day: 5, activity: 'Revision & Peer Discussion' }
+      { day: 1, activity: rev(`Picture Discovery: ${t}`) },
+      { day: 2, activity: rev(`Interactive Story: ${t}`) },
+      { day: 3, activity: rev(`Rhymes & Rhythm of ${t}`) }
     ];
   }
+  if (classGrade === 2) {
+    return [
+      { day: 1, activity: rev(`Drawing ${t} Concepts`) },
+      { day: 2, activity: rev(`Matching Game: ${t}`) },
+      { day: 3, activity: rev(`Basic Identification: ${t}`) }
+    ];
+  }
+  if (classGrade === 3) {
+    return [
+      { day: 1, activity: rev(`${t}: Foundation Concepts`) },
+      { day: 2, activity: rev(`Tracing & Writing ${t}`) },
+      { day: 3, activity: rev(`Short Paragraph Practice`) },
+      { day: 4, activity: rev(`Class 3 Level Quiz`) }
+    ];
+  }
+  if (classGrade === 4) {
+    return [
+      { day: 1, activity: rev(`${t}: Intermediate Introduction`) },
+      { day: 2, activity: rev(`Practical Examples of ${t}`) },
+      { day: 3, activity: rev(`Collaborative Activity`) },
+      { day: 4, activity: rev(`Class 4 Standard Quiz`) }
+    ];
+  }
+  if (classGrade === 5) {
+    return [
+      { day: 1, activity: rev(`Exploring ${t}: Core Logic`) },
+      { day: 2, activity: rev(`Practice Worksheet A`) },
+      { day: 3, activity: rev(`Scientific Methods: ${t}`) },
+      { day: 4, activity: rev(`Weekly 5th Grade Test`) },
+      { day: 5, activity: rev(`Reflection & Summary`) }
+    ];
+  }
+  if (classGrade === 6) {
+    return [
+      { day: 1, activity: rev(`${t}: Global Context`) },
+      { day: 2, activity: rev(`Formula Applications`) },
+      { day: 3, activity: rev(`Mini Project on ${t}`) },
+      { day: 4, activity: rev(`Analytical Assessment`) },
+      { day: 5, activity: rev(`Doubt Resolution Session`) }
+    ];
+  }
+  if (classGrade === 7) {
+    return [
+      { day: 1, activity: rev(`${t}: Advanced Foundations`) },
+      { day: 2, activity: rev(`Comparative Studies`) },
+      { day: 3, activity: rev(`Lab Simulation/Demonstration`) },
+      { day: 4, activity: rev(`Intensive Problem Set`) },
+      { day: 5, activity: rev(`Peer Assessment Cycle`) }
+    ];
+  }
+  if (classGrade === 8) {
+    return [
+      { day: 1, activity: rev(`${t}: Conceptual Depth`) },
+      { day: 2, activity: rev(`Case Study Analysis`) },
+      { day: 3, activity: rev(`Practical Experiments`) },
+      { day: 4, activity: rev(`Logical Reasoning Quiz`) },
+      { day: 5, activity: rev(`Curated Research Task`) },
+      { day: 6, activity: rev(`Weekly Mastery Review`) }
+    ];
+  }
+  if (classGrade === 9) {
+    return [
+      { day: 1, activity: rev(`${t}: Theoretical Mastery`) },
+      { day: 2, activity: rev(`Industrial Application`) },
+      { day: 3, activity: rev(`Abstract Problem Solving`) },
+      { day: 4, activity: rev(`Board Pattern Questions`) },
+      { day: 5, activity: rev(`Comprehensive Exam Prep`) },
+      { day: 6, activity: rev(`Critical Refinement`) }
+    ];
+  }
+  if (classGrade === 10) {
+    return [
+      { day: 1, activity: rev(`${t}: Syllabus Deep Dive`) },
+      { day: 2, activity: rev(`Speed Execution Drill`) },
+      { day: 3, activity: rev(`Complex Theoretical Scenarios`) },
+      { day: 4, activity: rev(`Previous Year Analysis`) },
+      { day: 5, activity: rev(`Mock Board Assessment`) },
+      { day: 6, activity: rev(`Error Correction Lab`) },
+      { day: 7, activity: rev(`Final Syllabus Checklist`) }
+    ];
+  }
+  if (classGrade === 11) {
+    return [
+      { day: 1, activity: rev(`${t}: Specialization Entry`) },
+      { day: 2, activity: rev(`Advanced Derivations`) },
+      { day: 3, activity: rev(`Competitive Level Logic`) },
+      { day: 4, activity: rev(`Scientific Reasoning Quiz`) },
+      { day: 5, activity: rev(`Self-Study & Documentation`) },
+      { day: 6, activity: rev(`Advanced Mastery Workshop`) },
+      { day: 7, activity: rev(`Personal Goal Review`) }
+    ];
+  }
+  if (classGrade === 12) {
+    return [
+      { day: 1, activity: rev(`${t}: Expert Perspective`) },
+      { day: 2, activity: rev(`Edge Cases & Anomalies`) },
+      { day: 3, activity: rev(`University Entrance Prep`) },
+      { day: 4, activity: rev(`High-Stakes Timed Quiz`) },
+      { day: 5, activity: rev(`Collaborative Research`) },
+      { day: 6, activity: rev(`Subject Mastery Defense`) },
+      { day: 7, activity: rev(`Final Academic Roadmap`) }
+    ];
+  }
+
+  // Fallback for any other value (5 Days)
+  return [
+    { day: 1, activity: rev(`Basic Introduction: ${t}`) },
+    { day: 2, activity: rev(`Standard Practice`) },
+    { day: 3, activity: rev(`Interactive Session`) },
+    { day: 4, activity: rev(`Standard Quiz`) },
+    { day: 5, activity: rev(`Topic Summary`) }
+  ];
 }
 
 /**

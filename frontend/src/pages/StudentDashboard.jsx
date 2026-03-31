@@ -33,6 +33,11 @@ export default function StudentDashboard() {
       const d = await res.json();
       setData(d);
       
+      // Sync entire student profile from API to ensure everything (including mentor info) is up-to-date
+      if (d.student) {
+        setUser(prev => ({ ...prev, ...d.student }));
+      }
+      
       const resAI = await fetch(`http://127.0.0.1:5000/api/ai/lessons/${u._id}`);
       const jAI = await resAI.json();
       setLessons(Array.isArray(jAI) ? jAI : []);
@@ -168,175 +173,174 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="container animate-fade-in">
-      <div className="dashboard-header">
-        <div>
-          <h1>Student Portal</h1>
-          <p>
-            Welcome back! You are on{' '}
-            <span style={{ color: levelColor[user?.learningLevel], fontWeight: 'bold' }}>
-              {levelEmoji[user?.learningLevel]} {user?.learningLevel}
-            </span>{' '}Level.
-          </p>
+    <>
+      <div className="container animate-fade-in">
+        <div className="dashboard-header">
+          <div>
+            <h1>Student Portal</h1>
+            <p>
+              Welcome back! You are on{' '}
+              <span style={{ color: levelColor[user?.learningLevel], fontWeight: 'bold' }}>
+                {levelEmoji[user?.learningLevel]} {user?.learningLevel}
+              </span>{' '}Level.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-secondary" onClick={toggleProfile} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <User size={16} /> Profile
+            </button>
+            <button className="btn btn-secondary" onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              Logout <LogOut size={16} />
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-secondary" onClick={toggleProfile} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <User size={16} /> Profile
-          </button>
-          <button className="btn btn-secondary" onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            Logout <LogOut size={16} />
-          </button>
-        </div>
+
+        {!data ? <p>Loading your learning journey...</p> : (
+          <div className="grid-cols-2">
+            {/* Progress Chart */}
+            <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Award size={24} color="var(--primary-hover)" /> Your Progress
+              </h2>
+              <p>Recent quiz scores</p>
+              {chartData.length > 0 ? (
+                <div style={{ width: '100%', height: '300px', marginTop: '1rem' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="score" stroke="var(--primary-color)" strokeWidth={3} activeDot={{ r: 8 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : <p>No test data available yet.</p>}
+            </div>
+
+            {/* ── Upcoming Sessions ── */}
+            <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem' }}>
+                <Calendar size={24} color="var(--primary-color)" /> My Upcoming Sessions
+              </h2>
+              {upcomingSessions.length === 0 ? (
+                <p style={{ opacity: 0.6 }}>No sessions scheduled yet. Check back soon!</p>
+              ) : (
+                <div className="grid-cols-3" style={{ gap: '1rem' }}>
+                  {upcomingSessions.map((session, idx) => (
+                    <div key={idx} className="glass-panel" style={{ background: 'rgba(99, 102, 241, 0.03)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
+                      <h4 style={{ margin: 0, color: 'var(--primary-color)' }}>
+                        {new Date(session.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </h4>
+                      <p style={{ margin: '4px 0', fontWeight: 'bold', fontSize: '1.1rem' }}>{session.time}</p>
+                      <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.8 }}>Mentor: {session.mentorId?.name}</p>
+                      <p style={{ margin: '8px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Topic: {session.topic}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── AI Lessons from Mentor ── */}
+            <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem' }}>
+                <BookOpen size={24} color="#6366f1" /> My AI Lessons from Mentor
+              </h2>
+
+              {lessons.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.6 }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📚</div>
+                  <p>No lessons assigned yet. Your mentor will send personalised lessons soon!</p>
+                </div>
+              ) : (
+                <div className="grid-cols-2" style={{ gap: '1rem' }}>
+                  {lessons.map((lesson) => (
+                    <div
+                      key={lesson._id}
+                      className="glass-panel"
+                      style={{
+                        cursor: 'pointer',
+                        border: lesson.completed ? '1px solid #22c55e' : '1px solid rgba(99,102,241,0.3)',
+                        transition: 'transform 0.2s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <h4 style={{ margin: 0, color: '#6366f1' }}>📖 {lesson.topic}</h4>
+                        {lesson.completed
+                          ? <span style={{ fontSize: '0.78rem', background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '2px 8px', borderRadius: '20px' }}>✓ Done · {lesson.quizScore}%</span>
+                          : <span style={{ fontSize: '0.78rem', background: 'rgba(99,102,241,0.15)', color: '#6366f1', padding: '2px 8px', borderRadius: '20px' }}>New</span>
+                        }
+                      </div>
+                      <p style={{ margin: '0 0 4px', fontSize: '0.82rem', opacity: 0.7 }}>
+                        Class {lesson.classGrade} · {lesson.level} · {lesson.quiz.length} questions
+                      </p>
+                      <p style={{ margin: '0 0 0.75rem', fontSize: '0.82rem', opacity: 0.6 }}>
+                        {new Date(lesson.assignedAt).toLocaleDateString()}
+                      </p>
+                      <button
+                        className="btn btn-primary"
+                        style={{ width: '100%', background: lesson.completed ? 'rgba(34,197,94,0.2)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: lesson.completed ? '#22c55e' : '#fff' }}
+                        onClick={() => openLessonView(lesson)}
+                      >
+                        {lesson.completed ? '📋 Review Lesson' : '▶ Start Lesson & Quiz'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {!data ? <p>Loading your learning journey...</p> : (
-        <div className="grid-cols-2">
+      {/* ── Floating Doubt Hub (Message Icon) ── */}
+      <button 
+        className="btn btn-primary" 
+        style={{ 
+          position: 'fixed', bottom: '30px', right: '30px', 
+          width: '56px', height: '56px', borderRadius: '50%', padding: 0,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}
+        onClick={() => setShowDoubtPanel(!showDoubtPanel)}
+      >
+        {showDoubtPanel ? <XCircle size={28} /> : <MessageCircle size={28} />}
+      </button>
 
-
-
-          {/* Progress Chart */}
-          <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Award size={24} color="var(--primary-hover)" /> Your Progress
-            </h2>
-            <p>Recent quiz scores</p>
-            {chartData.length > 0 ? (
-              <div style={{ width: '100%', height: '300px', marginTop: '1rem' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="score" stroke="var(--primary-color)" strokeWidth={3} activeDot={{ r: 8 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : <p>No test data available yet.</p>}
-          </div>
-
-          {/* ── Upcoming Sessions ── */}
-          <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem' }}>
-              <Calendar size={24} color="var(--primary-color)" /> My Upcoming Sessions
-            </h2>
-            {upcomingSessions.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>No sessions scheduled yet. Check back soon!</p>
-            ) : (
-              <div className="grid-cols-3" style={{ gap: '1rem' }}>
-                {upcomingSessions.map((session, idx) => (
-                  <div key={idx} className="glass-panel" style={{ background: 'rgba(99, 102, 241, 0.03)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
-                    <h4 style={{ margin: 0, color: 'var(--primary-color)' }}>
-                      {new Date(session.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                    </h4>
-                    <p style={{ margin: '4px 0', fontWeight: 'bold', fontSize: '1.1rem' }}>{session.time}</p>
-                    <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.8 }}>Mentor: {session.mentorId?.name}</p>
-                    <p style={{ margin: '8px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Topic: {session.topic}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ── AI Lessons from Mentor ── */}
-          <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem' }}>
-              <BookOpen size={24} color="#6366f1" /> My AI Lessons from Mentor
-            </h2>
-
-            {lessons.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.6 }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📚</div>
-                <p>No lessons assigned yet. Your mentor will send personalised lessons soon!</p>
-              </div>
-            ) : (
-              <div className="grid-cols-2" style={{ gap: '1rem' }}>
-                {lessons.map((lesson) => (
-                  <div
-                    key={lesson._id}
-                    className="glass-panel"
-                    style={{
-                      cursor: 'pointer',
-                      border: lesson.completed ? '1px solid #22c55e' : '1px solid rgba(99,102,241,0.3)',
-                      transition: 'transform 0.2s'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
-                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <h4 style={{ margin: 0, color: '#6366f1' }}>📖 {lesson.topic}</h4>
-                      {lesson.completed
-                        ? <span style={{ fontSize: '0.78rem', background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '2px 8px', borderRadius: '20px' }}>✓ Done · {lesson.quizScore}%</span>
-                        : <span style={{ fontSize: '0.78rem', background: 'rgba(99,102,241,0.15)', color: '#6366f1', padding: '2px 8px', borderRadius: '20px' }}>New</span>
-                      }
-                    </div>
-                    <p style={{ margin: '0 0 4px', fontSize: '0.82rem', opacity: 0.7 }}>
-                      Class {lesson.classGrade} · {lesson.level} · {lesson.quiz.length} questions
-                    </p>
-                    <p style={{ margin: '0 0 0.75rem', fontSize: '0.82rem', opacity: 0.6 }}>
-                      {new Date(lesson.assignedAt).toLocaleDateString()}
-                    </p>
-                    <button
-                      className="btn btn-primary"
-                      style={{ width: '100%', background: lesson.completed ? 'rgba(34,197,94,0.2)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: lesson.completed ? '#22c55e' : '#fff' }}
-                      onClick={() => openLessonView(lesson)}
-                    >
-                      {lesson.completed ? '📋 Review Lesson' : '▶ Start Lesson & Quiz'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ── Floating Doubt Hub (Message Icon) ── */}
-          <button 
-            className="btn btn-primary" 
-            style={{ 
-              position: 'fixed', bottom: '30px', right: '30px', 
-              width: '56px', height: '56px', borderRadius: '50%', padding: 0,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 100,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}
-            onClick={() => setShowDoubtPanel(!showDoubtPanel)}
-          >
-            {showDoubtPanel ? <XCircle size={28} /> : <MessageCircle size={28} />}
-          </button>
-
-          {showDoubtPanel && (
-            <div className="glass-panel animate-slide-up" style={{ 
-              position: 'fixed', bottom: '100px', right: '30px', 
-              width: '380px', maxHeight: '500px', overflowY: 'auto', 
-              zIndex: 100, border: '1px solid rgba(255,255,255,0.2)' 
-            }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', marginBottom: '1rem' }}>
-                <HelpCircle size={20} color="var(--primary-color)" /> Doubt Hub
-              </h2>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <textarea className="form-control" rows="2" placeholder="Type your question..." value={doubtText} onChange={e => setDoubtText(e.target.value)} style={{ padding: '8px', fontSize: '0.9rem' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                    <small style={{ color: 'var(--primary-color)', fontSize: '0.7rem' }}>{doubtStatus}</small>
-                    <button className="btn btn-secondary" onClick={() => submitDoubt('text')} disabled={!doubtText} style={{ padding: '4px 10px', fontSize: '0.8rem' }}><Send size={14} /></button>
-                  </div>
-                </div>
-                <button onClick={startVoiceRecording} className={`btn ${isRecording ? 'btn-danger' : 'btn-primary'}`} style={{ borderRadius: '50%', width: '36px', height: '36px', padding: 0 }}>
-                  <Mic size={16} />
-                </button>
-              </div>
-
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '10px' }}>Recent Responses</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {data.doubts?.length === 0 ? <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>No messages yet.</p> :
-                  data.doubts?.map(doubt => (
-                  <div key={doubt._id} style={{ padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                    <div style={{ marginBottom: '4px' }}><strong>Q:</strong> {doubt.question}</div>
-                    {doubt.answer && <div style={{ color: 'var(--primary-color)', background: 'rgba(99,102,241,0.1)', padding: '6px', borderRadius: '4px' }}><strong>A:</strong> {doubt.answer}</div>}
-                  </div>
-                ))}
+      {showDoubtPanel && (
+        <div className="glass-panel animate-slide-up" style={{ 
+          position: 'fixed', bottom: '100px', right: '30px', 
+          width: '380px', maxHeight: '500px', overflowY: 'auto', 
+          zIndex: 100, border: '1px solid rgba(255,255,255,0.2)' 
+        }}>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', marginBottom: '1rem' }}>
+            <HelpCircle size={20} color="var(--primary-color)" /> Doubt Hub
+          </h2>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+            <div style={{ flex: 1 }}>
+              <textarea className="form-control" rows="2" placeholder="Type your question..." value={doubtText} onChange={e => setDoubtText(e.target.value)} style={{ padding: '8px', fontSize: '0.9rem' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                <small style={{ color: 'var(--primary-color)', fontSize: '0.7rem' }}>{doubtStatus}</small>
+                <button className="btn btn-secondary" onClick={() => submitDoubt('text')} disabled={!doubtText} style={{ padding: '4px 10px', fontSize: '0.8rem' }}><Send size={14} /></button>
               </div>
             </div>
-          )}
+            <button onClick={startVoiceRecording} className={`btn ${isRecording ? 'btn-danger' : 'btn-primary'}`} style={{ borderRadius: '50%', width: '36px', height: '36px', padding: 0 }}>
+              <Mic size={16} />
+            </button>
+          </div>
+
+          <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '10px' }}>Recent Responses</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {data?.doubts?.length === 0 ? <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>No messages yet.</p> :
+              data?.doubts?.map(doubt => (
+              <div key={doubt._id} style={{ padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                <div style={{ marginBottom: '4px' }}><strong>Q:</strong> {doubt.question}</div>
+                {doubt.answer && <div style={{ color: 'var(--primary-color)', background: 'rgba(99,102,241,0.1)', padding: '6px', borderRadius: '4px' }}><strong>A:</strong> {doubt.answer}</div>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -493,6 +497,7 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
+
       {/* ── Profile Modal ── */}
       {showProfile && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -560,6 +565,27 @@ export default function StudentDashboard() {
                    {levelEmoji[user.learningLevel]} {user.learningLevel}
                 </span>
               </div>
+
+              <div style={{ padding: '12px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '10px', border: '1px solid rgba(99, 102, 241, 0.1)', marginTop: '5px' }}>
+                <label style={{ fontSize: '0.85rem', opacity: 0.7, display: 'block', marginBottom: '4px' }}>Assigned Mentor</label>
+                {user.mentorId && typeof user.mentorId === 'object' && user.mentorId.name ? (
+                  <>
+                    <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1rem' }}>
+                      👤 {user.mentorId.name}
+                    </p>
+                  </>
+                ) : (upcomingSessions.length > 0 && upcomingSessions[0].mentorId?.name) ? (
+                  <>
+                    <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1rem' }}>
+                      👤 {upcomingSessions[0].mentorId.name}
+                    </p>
+                  </>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--alert-red)', fontStyle: 'italic' }}>
+                    🕒 Waiting for assignment...
+                  </p>
+                )}
+              </div>
             </div>
 
             <div style={{ marginTop: '2rem', display: 'flex', gap: '10px' }}>
@@ -577,6 +603,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

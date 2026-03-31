@@ -114,7 +114,33 @@ router.get('/students/class/:grade', async (req, res) => {
 // Student Dashboard: Get learning plan and progress
 router.get('/student/dashboard/:id', async (req, res) => {
     try {
-        const student = await User.findById(req.params.id);
+        let student = await User.findById(req.params.id).populate('mentorId', 'name email subjects');
+        
+        // ── ROBUST DISCOVERY FALLBACK ──
+        // If student has no mentor assigned directly, check other sources of truth
+        if (!student.mentorId) {
+            console.log(`[Discovery] Student ${student.name} (${student._id}) missing mentorId. Checking fallbacks...`);
+            
+            // 1. Check for Approved Match in Match Collection
+            const approvedMatch = await Match.findOne({ studentId: student._id, status: 'approved' })
+                .populate('mentorId', 'name email subjects');
+            
+            if (approvedMatch && approvedMatch.mentorId) {
+                console.log(`[Discovery] Found approved match with mentor: ${approvedMatch.mentorId.name}. Auto-repairing student record.`);
+                student.mentorId = approvedMatch.mentorId;
+                // Permanently repair the student record in DB
+                await User.findByIdAndUpdate(student._id, { mentorId: approvedMatch.mentorId._id });
+            } else {
+                // 2. Check for Reverse Mapping (Does any Mentor have this Student in their list?)
+                const mentor = await User.findOne({ role: 'Mentor', studentsAssigned: student._id }, 'name email subjects');
+                if (mentor) {
+                    console.log(`[Discovery] Found reverse mapping from mentor: ${mentor.name}. Auto-repairing student record.`);
+                    student.mentorId = mentor;
+                    // Permanently repair the student record in DB
+                    await User.findByIdAndUpdate(student._id, { mentorId: mentor._id });
+                }
+            }
+        }
         const progressList = await Progress.find({ studentId: student._id }).populate('topicId').sort({ date: -1 });
         const latestProgress = progressList[0];
         
@@ -127,7 +153,7 @@ router.get('/student/dashboard/:id', async (req, res) => {
         }
 
         const doubts = await Doubt.find({ studentId: student._id }).sort({ createdAt: -1 });
-        const plan = generateLearningPlan(topic || { topic: 'General Studies' }, latestProgress ? latestProgress.quizScore : null);
+        const plan = generateLearningPlan(topic || { topic: 'General Studies' }, latestProgress ? latestProgress.quizScore : null, student.classGrade);
 
         res.json({
             student,
@@ -409,11 +435,12 @@ router.post('/admin/assign', async (req, res) => {
     }
 });
 
-// Mentor: Get upcoming Sessions (Dynamically scheduled starting Saturday)
+// Mentor: Get upcoming Sessions (Dynamically scheduled starting Saturday + Persisted Notes)
 router.get('/sessions/mentor/:mentorId', async (req, res) => {
     try {
-        const students = await User.find({ mentorId: req.params.mentorId, role: 'Student' }).sort({ _id: 1 });
-        const mentor = await User.findById(req.params.mentorId);
+        const mentorId = req.params.mentorId;
+        const students = await User.find({ mentorId, role: 'Student' }).sort({ _id: 1 });
+        const mentor = await User.findById(mentorId);
         if (!mentor) return res.status(404).json({ error: 'Mentor not found' });
 
         // Calculate next Saturday
@@ -430,6 +457,13 @@ router.get('/sessions/mentor/:mentorId', async (req, res) => {
         const schedule = [];
         const slotsTaken = new Set();
 
+        // 1. Fetch persisted sessions from the DB
+        const persistedSessions = await Session.find({
+            mentorId, 
+            status: 'Scheduled', 
+            date: { $gte: new Date() } 
+        }).populate('studentId', 'name learningLevel timeSlot');
+
         for (const student of students) {
           const preferredTime = student.timeSlot || '4-5 PM';
           let daysOffset = 0;
@@ -443,22 +477,68 @@ router.get('/sessions/mentor/:mentorId', async (req, res) => {
           const sessionDate = new Date(startDate);
           sessionDate.setDate(sessionDate.getDate() + daysOffset);
 
-          schedule.push({
-            _id: `temp-${student._id}`,
-            studentId: { 
-              _id: student._id, 
-              name: student.name, 
-              learningLevel: student.learningLevel,
-              timeSlot: student.timeSlot 
-            },
-            date: sessionDate,
-            topic: student.subject || 'Weekly Review',
-            status: 'Scheduled',
-            time: preferredTime
-          });
+          // 2. Check if a persisted session exists for this student and date
+          const persisted = persistedSessions.find(ps => 
+              ps.studentId._id.toString() === student._id.toString() &&
+              new Date(ps.date).toDateString() === sessionDate.toDateString()
+          );
+
+          if (persisted) {
+            schedule.push(persisted);
+          } else {
+            schedule.push({
+              _id: `temp-${student._id}-${sessionDate.getTime()}`,
+              studentId: { 
+                _id: student._id, 
+                name: student.name, 
+                learningLevel: student.learningLevel,
+                timeSlot: student.timeSlot 
+              },
+              date: sessionDate,
+              topic: student.subject || 'Weekly Review',
+              status: 'Scheduled',
+              time: preferredTime,
+              preSessionNotes: ''
+            });
+          }
         }
 
         res.json(schedule);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Mentor: Save Session Notes
+router.post('/sessions/save-notes', async (req, res) => {
+    try {
+        const { mentorId, studentId, date, time, topic, notes } = req.body;
+        
+        let session = await Session.findOne({
+            mentorId,
+            studentId,
+            date: new Date(date),
+            status: 'Scheduled'
+        });
+
+        if (session) {
+            session.preSessionNotes = notes;
+            if (topic) session.topic = topic;
+            await session.save();
+        } else {
+            session = new Session({
+                mentorId,
+                studentId,
+                date: new Date(date),
+                topic: topic || 'Weekly Review',
+                time,
+                status: 'Scheduled',
+                preSessionNotes: notes
+            });
+            await session.save();
+        }
+
+        res.json(session);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
