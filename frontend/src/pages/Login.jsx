@@ -110,12 +110,34 @@ export default function Login() {
             <p style={{ fontSize: '0.85rem' }}>New to platform? <Link to="/signup" style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>Create account</Link></p>
           </div>
         </form>
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center' }}>
           <button
             onClick={() => setShowAdminModal(true)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem', opacity: 0.6 }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.opacity = '0.6';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+            style={{ 
+              background: 'rgba(99, 102, 241, 0.05)', 
+              border: '1px solid rgba(99, 102, 241, 0.2)', 
+              color: 'var(--primary-color)', 
+              padding: '10px 15px', 
+              borderRadius: '8px', 
+              cursor: 'pointer', 
+              fontSize: '0.8rem', 
+              opacity: 0.6, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              fontWeight: '600', 
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' 
+            }}
           >
-            NGO Administrative Portal Access
+            <ShieldCheck size={14} /> NGO Staff Support Access
           </button>
         </div>
       </div>
